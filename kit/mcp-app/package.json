@@ -1,0 +1,6 @@
+{
+  "name": "artifact-relay-mcp-app-kit",
+  "private": true,
+  "type": "module",
+  "description": "Artifact Relay for MCP Apps: ES modules for the server (server/) and the widget build (widget/). Copy this folder into your MCP server project."
+}

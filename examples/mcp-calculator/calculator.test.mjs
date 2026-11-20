@@ -1,41 +1,80 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { createMcpDb } from '../../kit/mcp-app/widget/mcp-db.js';
 
-const uriPattern = /^ui:\/\/artifact-relay\/calculator-[0-9a-f]{8}$/; // hash of the bundle, so hosts cannot serve a stale widget
+const serverPath = fileURLToPath(new URL('./server.mjs', import.meta.url));
+const bridgeSource = readFileSync(fileURLToPath(new URL('../../kit/multi-file/rc/bridge.js', import.meta.url)), 'utf8');
+const base = 'data/users/local/rc';
 const timeout = { timeout: 10_000 };
+const uriPattern = /^ui:\/\/artifact-relay\/calculator-[0-9a-f]{8}$/; // hash of the bundle, so hosts cannot serve a stale widget
+const jpeg = Buffer.from('not really a jpeg, but valid base64').toString('base64');
 
-test('stdio host discovers the app, reads its bundled view, and calls typed arithmetic', { timeout: 35_000 }, async () => {
+async function connect() {
   const client = new Client({ name: 'calculator-test', version: '1.0.0' });
-  const transport = new StdioClientTransport({
-    command: process.execPath, args: [fileURLToPath(new URL('./server.mjs', import.meta.url))],
-  });
+  await client.connect(new StdioClientTransport({ command: process.execPath, args: [serverPath] }), timeout);
   const call = (name, args = {}) => client.callTool({ name, arguments: args }, undefined, timeout);
+  return { client, call };
+}
+
+// The widget's side, run in Node: the real, unmodified bridge.js on top of the MCP database shim.
+// Only what ping, call and screenshot need is faked (a document-like root and the snapshot function).
+function startWidget(call, { actions = {} } = {}) {
+  const callRelay = async (args) => {
+    const r = await call('relay_db', args);
+    if (r.isError) throw Object.assign(new Error(r.structuredContent?.message ?? 'relay_db failed'), { code: r.structuredContent?.code });
+    return r.structuredContent;
+  };
+  const unref = (timer) => { timer.unref?.(); return timer; };
+  const context = vm.createContext({
+    console, document: {}, window: {},
+    setTimeout: (f, ms) => unref(setTimeout(f, ms)), setInterval: (f, ms) => unref(setInterval(f, ms)),
+    clearTimeout, clearInterval,
+  });
+  const { createBridge } = vm.runInContext(bridgeSource + '\n({ createBridge })', context);
+  const states = [];
+  const logs = [];
+  const bridge = createBridge({
+    db: createMcpDb(callRelay, { pollMs: 100 }), base,
+    root: { ownerDocument: { visibilityState: 'visible', defaultView: {} } },
+    limits: { requireAgent: true, leaseMs: 5_000 },
+    actions, snapshot: async () => 'data:image/jpeg;base64,' + jpeg,
+    onState: (s, d) => states.push([s, d]), onLog: (l) => logs.push(l),
+  });
+  return { bridge, states, logs };
+}
+
+test('stdio host discovers the app, reads its bundled widget, and calls typed arithmetic', { timeout: 35_000 }, async () => {
+  const { client, call } = await connect();
   const arithmetic = (left, operation, right) => call('relay_calculate', { left, operation, right });
   try {
-    await client.connect(transport, timeout);
     const { tools } = await client.listTools({}, timeout);
     assert.deepEqual(tools.map(({ name }) => name).sort(), [
-      'relay_ack_view', 'relay_arm_view', 'relay_calculate', 'relay_calculator_receipt',
-      'relay_drive_calculator', 'relay_inspect_calculator', 'relay_open_calculator', 'relay_poll_view',
-      'relay_smoke', 'relay_snapshot_calculator',
+      'relay_calculate', 'relay_db', 'relay_open_calculator', 'relay_result', 'relay_send', 'relay_smoke',
     ]);
     const open = tools.find(({ name }) => name === 'relay_open_calculator');
     const uri = open._meta.ui.resourceUri;
     assert.match(uri, uriPattern);
     assert.deepEqual(open._meta.ui, { resourceUri: uri, visibility: ['model'] });
-    assert.deepEqual(tools.find(({ name }) => name === 'relay_calculate')._meta.ui,
-      { resourceUri: uri, visibility: ['app'] });
+    for (const name of ['relay_calculate', 'relay_db']) {
+      assert.deepEqual(tools.find((t) => t.name === name)._meta.ui, { resourceUri: uri, visibility: ['app'] }, name);
+    }
+    for (const name of ['relay_send', 'relay_result']) assert.equal(tools.find((t) => t.name === name)._meta?.ui, undefined, name);
     assert.notEqual((await call(open.name)).isError, true);
+
     const { resources } = await client.listResources({}, timeout);
     assert.deepEqual(resources.map((item) => item.uri), [uri]);
     const { contents: [view] } = await client.readResource({ uri }, timeout);
     assert.equal(view.mimeType, 'text/html;profile=mcp-app');
     assert.match(view.text, /<title>Relay Calculator<\/title>/);
-    assert.match(view.text, /<script>[\s\S]+relay_calculate[\s\S]+<\/script>/);
-    assert.doesNotMatch(view.text, /<script[^>]+src=|<!-- CALCULATOR_SCRIPT -->/);
+    for (const part of ['REMOTE CONTROL BRIDGE v2', 'REMOTE CONTROL WIRING', 'relay_db', 'relay_calculate', 'id="rc-state"', 'REMOTE_ACTIONS']) {
+      assert.ok(view.text.includes(part), `the widget should contain ${part}`);
+    }
+    assert.doesNotMatch(view.text, /<script[^>]+src=|<!-- RELAY_(PANEL|SCRIPTS) -->/);
 
     const product = await arithmetic(7, 'multiply', 6);
     assert.notEqual(product.isError, true);
@@ -63,162 +102,89 @@ test('stdio host discovers the app, reads its bundled view, and calls typed arit
   }
 });
 
-test('Relay queues one typed action and records only the targeted view receipt', { timeout: 40_000 }, async () => {
-  const client = new Client({ name: 'relay-test', version: '1.0.0' });
-  const transport = new StdioClientTransport({
-    command: process.execPath, args: [fileURLToPath(new URL('./server.mjs', import.meta.url))],
-  });
-  const call = (name, args = {}) => client.callTool({ name, arguments: args }, undefined, timeout);
+test('the unchanged kit bridge runs over MCP: ping, named action, screenshot as an image, lock, pause', { timeout: 45_000 }, async () => {
+  const { client, call } = await connect();
   const ok = async (name, args) => {
-    const result = await call(name, args);
-    assert.notEqual(result.isError, true, JSON.stringify(result.content));
-    return result.structuredContent;
+    const r = await call(name, args);
+    assert.notEqual(r.isError, true, JSON.stringify(r.content));
+    return r;
   };
-  const rejected = async (name, args) => assert.equal((await call(name, args)).isError, true);
-  const arm = async () => {
-    const { viewCode, viewToken } = await ok('relay_arm_view');
-    return { viewCode, viewToken };
-  };
+  const widget = startWidget(call, {
+    actions: { getState: async () => ({ result: '8 × 9 = 72' }), boom: async () => { throw new Error('nope'); } },
+  });
   try {
-    await client.connect(transport, timeout);
-    const { tools } = await client.listTools({}, timeout);
-    const uri = tools.find(({ name }) => name === 'relay_open_calculator')._meta.ui.resourceUri;
-    for (const name of ['relay_arm_view', 'relay_poll_view', 'relay_ack_view']) {
-      assert.deepEqual(tools.find((tool) => tool.name === name)._meta.ui, { resourceUri: uri, visibility: ['app'] });
-    }
-    assert.equal(tools.find((tool) => tool.name === 'relay_drive_calculator')._meta?.ui?.resourceUri, undefined);
-    const action = { left: 8, operation: 'multiply', right: 9 };
-    await rejected('relay_drive_calculator', action); // nothing is listening yet
-    const a = await arm();
-    const b = await arm();
-    assert.notEqual(a.viewCode, b.viewCode);
-    await rejected('relay_drive_calculator', action); // two listeners: ambiguous without a code
-    const target = { viewCode: a.viewCode, ...action };
-    await rejected('relay_drive_calculator', { ...target, operation: 'power' });
-    await rejected('relay_drive_calculator', { ...target, selector: 'body' });
-    const queued = await ok('relay_drive_calculator', target);
-    assert.deepEqual(queued, { phase: 'queued', id: queued.id, viewCode: a.viewCode });
-    const receipt = { viewCode: a.viewCode, id: queued.id };
-    assert.equal((await ok('relay_calculator_receipt', receipt)).phase, 'queued');
-    await rejected('relay_drive_calculator', target);
-    await rejected('relay_poll_view', { ...a, viewToken: b.viewToken });
-    assert.deepEqual(await ok('relay_poll_view', b), { phase: 'armed' });
-    const delivery = await ok('relay_poll_view', a);
-    assert.equal(delivery.id, queued.id);
-    assert.deepEqual(delivery.command, { kind: 'drive', ...action });
-    assert.deepEqual(await ok('relay_poll_view', a), { phase: 'delivered' });
-    const ack = { ...a, id: queued.id, proof: delivery.proof, result: { kind: 'drive', displayed: { value: 72 } } };
-    await rejected('relay_ack_view', { ...ack, viewToken: b.viewToken });
-    await rejected('relay_ack_view', { ...ack, proof: queued.id });
-    assert.equal((await ok('relay_calculator_receipt', receipt)).phase, 'delivered');
-    assert.equal((await ok('relay_ack_view', ack)).phase, 'rendered');
-    assert.deepEqual(await ok('relay_calculator_receipt', receipt), { ...receipt, phase: 'rendered', displayed: { value: 72 } });
-    await rejected('relay_ack_view', ack);
-    assert.deepEqual(await ok('relay_poll_view', b), { phase: 'armed' });
+    assert.equal(await widget.bridge.start(), true);
+    assert.deepEqual(widget.states.at(-1), ['on', 'waiting for commands']);
 
-    // A waiting receipt resolves in one call once the view acknowledges, and times out cleanly otherwise.
-    const second = await ok('relay_drive_calculator', { viewCode: b.viewCode, left: 3, operation: 'add', right: 4 });
-    const waited = call('relay_calculator_receipt', { viewCode: b.viewCode, id: second.id, waitMs: 8000 });
-    const started = Date.now();
-    const next = await ok('relay_poll_view', b);
-    await ok('relay_ack_view', { ...b, id: second.id, proof: next.proof, result: { kind: 'drive', displayed: { value: 7 } } });
-    const finished = await waited;
-    assert.notEqual(finished.isError, true);
-    assert.equal(finished.structuredContent.phase, 'rendered');
-    assert.ok(Date.now() - started < 4000);
-    // With a and b already used, a third view is the only one listening: no code is needed.
-    const c = await arm();
-    const idle = await ok('relay_drive_calculator', { left: 1, operation: 'add', right: 1 });
-    assert.equal(idle.viewCode, c.viewCode);
-    const timedOut = await ok('relay_calculator_receipt', { id: idle.id, waitMs: 500 }); // found by id alone
-    assert.deepEqual([timedOut.phase, timedOut.viewCode], ['queued', c.viewCode]);
-    await rejected('relay_calculator_receipt', { id: idle.id, waitMs: 60_000 });
+    // ping: the agent's tool reaches the widget's bridge and back
+    const ping = await ok('relay_send', { steps: [{ action: 'ping' }], agent: 'tester', waitMs: 8000 });
+    const pinged = JSON.parse(ping.content[0].text);
+    assert.equal(pinged.status, 'done');
+    assert.equal(pinged.results[0].pong, true);
+    assert.equal(pinged.results[0].version, '2.2');
+    assert.equal(ping.structuredContent.finished, true);
+
+    // a named action, then a screenshot that arrives as an image the agent can look at
+    const second = await ok('relay_send', { steps: [{ action: 'call', name: 'getState' }, { action: 'screenshot' }], agent: 'tester', waitMs: 8000 });
+    const done = JSON.parse(second.content[0].text);
+    assert.deepEqual(done.results[0].result, { result: '8 × 9 = 72' });
+    assert.equal(done.results[1].ok, true);
+    assert.ok(!second.content[0].text.includes(jpeg), 'image data must not be repeated in the text');
+    assert.deepEqual(second.content[1], { type: 'image', data: jpeg, mimeType: 'image/jpeg' });
+
+    // errors stay errors: an action that throws, an unknown action, a command that names no agent
+    const boom = await call('relay_send', { steps: [{ action: 'call', name: 'boom' }], agent: 'tester', waitMs: 8000 });
+    assert.equal(boom.isError, true);
+    assert.equal(JSON.parse(boom.content[0].text).status, 'error');
+    assert.match(JSON.parse(boom.content[0].text).error, /nope/);
+    const unknown = await call('relay_send', { steps: [{ action: 'eval', code: '1' }], agent: 'tester', waitMs: 8000 });
+    assert.equal(unknown.isError, true);
+    assert.equal(JSON.parse(unknown.content[0].text).status, 'invalid');
+    assert.equal((await call('relay_send', { steps: [{ action: 'ping' }] })).isError, true);
+
+    // the busy lock: tester still holds the app, so another agent is told to wait; takeover and release work
+    const busy = await call('relay_send', { steps: [{ action: 'call', name: 'getState' }], agent: 'other', waitMs: 8000 });
+    assert.equal(busy.isError, true);
+    assert.equal(JSON.parse(busy.content[0].text).status, 'busy');
+    await ok('relay_send', { steps: [{ action: 'call', name: 'getState' }], agent: 'tester', release: true, waitMs: 8000 });
+    await ok('relay_send', { steps: [{ action: 'call', name: 'getState' }], agent: 'other', release: true, waitMs: 8000 });
+
+    // pause holds a command; the agent gets its id back and fetches the result later
+    widget.bridge.pause(true);
+    const held = await ok('relay_send', { steps: [{ action: 'call', name: 'getState' }], agent: 'tester', waitMs: 400 });
+    assert.equal(held.structuredContent.finished, false);
+    widget.bridge.pause(false);
+    const later = await ok('relay_result', { id: held.structuredContent.id, waitMs: 8000 });
+    assert.equal(JSON.parse(later.content[0].text).status, 'done');
+    assert.equal((await call('relay_result', { id: 'no_such_command' })).isError, true);
   } finally {
+    widget.bridge.stop();
     await client.close();
   }
 });
 
-test('Relay readback: inspect state and snapshot image reach the agent, and bad answers do not', { timeout: 40_000 }, async () => {
-  const client = new Client({ name: 'readback-test', version: '1.0.0' });
-  const transport = new StdioClientTransport({
-    command: process.execPath, args: [fileURLToPath(new URL('./server.mjs', import.meta.url))],
-  });
-  const call = (name, args = {}) => client.callTool({ name, arguments: args }, undefined, timeout);
-  const ok = async (name, args) => {
-    const result = await call(name, args);
-    assert.notEqual(result.isError, true, JSON.stringify(result.content));
-    return result.structuredContent;
-  };
-  const rejected = async (name, args) => assert.equal((await call(name, args)).isError, true);
-  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const arm = async () => {
-    const { viewCode, viewToken } = await ok('relay_arm_view');
-    return { viewCode, viewToken };
-  };
-  // The view's side: take the delivered command.
-  const take = async (view) => {
-    for (let i = 0; i < 50; i++) {
-      const delivery = await ok('relay_poll_view', view);
-      if (delivery.phase === 'delivered') return delivery;
-      await pause(100);
-    }
-    throw new Error('nothing was delivered');
-  };
-  const state = {
-    left: '8', operation: 'multiply', right: '9', result: '8 × 9 = 72',
-    relayStatus: 'Relay listening · code abc', relayLast: 'Applied by Relay', connection: '',
-    calculateDisabled: false, armDisabled: true,
-  };
+test('the widget database accepts only Relay paths and sizes, and relay_send refuses without a widget', { timeout: 30_000 }, async () => {
+  const { client, call } = await connect();
+  const refused = async (args) => assert.equal((await call('relay_db', args)).isError, true, JSON.stringify(args));
   try {
-    await client.connect(transport, timeout);
+    const none = await call('relay_send', { steps: [{ action: 'ping' }], agent: 'tester' });
+    assert.equal(none.isError, true);
+    assert.match(none.content[0].text, /No Relay widget is connected/);
 
-    // Inspect: the agent gets the view's own state back in one call.
-    const v1 = await arm();
-    const inspecting = call('relay_inspect_calculator', { waitMs: 8000 });
-    const delivery = await take(v1);
-    assert.deepEqual(delivery.command, { kind: 'inspect' });
-    const ack = { ...v1, id: delivery.id, proof: delivery.proof };
-    await rejected('relay_ack_view', { ...ack, result: { kind: 'snapshot', jpeg: 'AAAA' } }); // wrong kind for this command
-    await rejected('relay_ack_view', { ...ack, result: { kind: 'inspect', state: { ...state, extra: 1 } } }); // unknown field
-    await rejected('relay_ack_view', { ...ack, result: { kind: 'inspect', state: { ...state, operation: 'power' } } });
-    await ok('relay_ack_view', { ...ack, result: { kind: 'inspect', state } });
-    const inspected = await inspecting;
-    assert.notEqual(inspected.isError, true);
-    assert.deepEqual(inspected.structuredContent, { viewCode: v1.viewCode, id: delivery.id, phase: 'rendered', state });
-    assert.match(inspected.content[0].text, /8 × 9 = 72/);
+    for (const path of ['data/users/other/rc/cmd/x', `${base}/cmd/../x`, `${base}/cmd/a/b`, `${base}/other/x`, `${base}/cmd/`, 'rc/cmd/x']) {
+      await refused({ op: 'set', path, data: { status: 'pending' } });
+    }
+    await refused({ op: 'update', path: `${base}/res/missing`, data: { status: 'done' } });          // update needs an existing document
+    await refused({ op: 'set', path: `${base}/res/big`, data: { text: 'x'.repeat(262_200) } });       // over 256 KiB
+    await refused({ op: 'query', collection: `${base}/res`, field: 'status', value: 'done' });        // only the command list can be listed
+    await refused({ op: 'query', collection: `${base}/cmd`, field: 'agent', value: 'x' });
+    await refused({ op: 'acquire', path: `${base}/cmd/x`, holder: 'h', ttlMs: 5 });
+    await refused({ op: 'drop', path: `${base}/cmd/x` });
 
-    // The view re-arms after answering; a request sent in that gap waits for the new code.
-    const gap = call('relay_inspect_calculator', { waitMs: 8000 });
-    await pause(700);
-    const v2 = await arm();
-    const second = await take(v2);
-    await ok('relay_ack_view', { ...v2, id: second.id, proof: second.proof, result: { kind: 'failed', reason: 'cannot read' } });
-    const failed = await gap;
-    assert.equal(failed.isError, true);
-    assert.match(failed.content[0].text, /cannot read/);
-
-    // Snapshot: the agent receives a real image content block, with the data kept out of structured output.
-    const jpeg = Buffer.from('not really a jpeg, but valid base64').toString('base64');
-    const v3 = await arm();
-    const picturing = call('relay_snapshot_calculator', { viewCode: v3.viewCode, waitMs: 8000 });
-    const picture = await take(v3);
-    assert.deepEqual(picture.command, { kind: 'snapshot' });
-    const shot = { ...v3, id: picture.id, proof: picture.proof };
-    await rejected('relay_ack_view', { ...shot, result: { kind: 'snapshot', jpeg: 'not base64!!' } });
-    await rejected('relay_ack_view', { ...shot, result: { kind: 'snapshot', jpeg: 'A'.repeat(190_001) } });
-    await ok('relay_ack_view', { ...shot, result: { kind: 'snapshot', jpeg } });
-    const image = await picturing;
-    assert.notEqual(image.isError, true);
-    assert.deepEqual(image.content[0], { type: 'image', data: jpeg, mimeType: 'image/jpeg' });
-    assert.equal(image.content[1].type, 'text');
-    assert.deepEqual(image.structuredContent, { viewCode: v3.viewCode, id: picture.id, phase: 'rendered', bytes: jpeg.length });
-
-    // A view that never answers times out cleanly and says so; a stale code is refused.
-    await arm();
-    const silent = await call('relay_snapshot_calculator', { waitMs: 400 });
-    assert.equal(silent.isError, true);
-    assert.equal(silent.structuredContent.phase, 'queued');
-    await rejected('relay_inspect_calculator', { viewCode: v1.viewCode, waitMs: 0 });
+    // leases: a second holder cannot take a live lease; the same holder can renew it
+    const path = `${base}/cmd/lease1`;
+    const lease = async (holder) => (await call('relay_db', { op: 'acquire', path, holder, ttlMs: 5_000 })).structuredContent.acquired;
+    assert.deepEqual([await lease('a'), await lease('b'), await lease('a')], [true, false, true]);
   } finally {
     await client.close();
   }

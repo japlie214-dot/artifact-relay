@@ -58,6 +58,19 @@ for (const f of ["actions.example.js", "prompts.md", "CHECKLIST.md", "README.md"
   put(rel, readFileSync(join(here, "src", "kit", f), "utf8"));
 }
 
+// The MCP App transport kit (server modules, widget shim, starter): plain files, copied as they are, in a stable order.
+// It reuses multi-file/rc/ (bridge.js, rc-wiring.js, panel) unchanged, so it adds no second bridge.
+const mcpKit = join(here, "src", "kit", "mcp-app");
+if (existsSync(mcpKit)) {
+  const walk = (dir, rel) => {
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const f = join(dir, e.name), r = rel + "/" + e.name;
+      if (e.isDirectory()) walk(f, r); else put(r, readFileSync(f, "utf8"));
+    }
+  };
+  walk(mcpKit, "mcp-app");
+}
+
 // 3. pages that embed the template and the kit
 // style gallery + the style files
 const styleDir = join(here, "src", "kit", "styles");
