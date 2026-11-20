@@ -1,0 +1,14 @@
+{
+  "description": "Stamps remote-control commands with the real session id, and remembers each session's title.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "ArtifactData", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
+    ]
+  }
+}

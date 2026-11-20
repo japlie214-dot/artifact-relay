@@ -1,0 +1,1260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artifact Relay Best Practices</title>
+<style>
+  /* One long, scannable page: golden rules, do and don't pairs, a tickable checklist, the pitfalls with live tests. */
+  :root {
+    --bg: #eef1f5; --surface: #ffffff; --ink: #16202b; --muted: #566474; --line: #d3dae3; --brand: #0b6e83; --brand-ink: #ffffff;
+    --good: #17693f; --good-bg: #e4f4ea; --bad: #9b1c1c; --bad-bg: #fdecec; --warn: #a85400; --warn-bg: #fff2df; --chip: #e7ecf2;
+    --code-bg: #0f1923; --code-fg: #dbe6f0; --c-kw: #ffb454; --c-str: #8bd5a0; --c-num: #f2a0a0; --c-key: #7ec8e3; --c-com: #70879b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1318; --surface: #161f29; --ink: #e5ecf3; --muted: #9aa9b8; --line: #2b3947; --brand: #4cc3dc; --brand-ink: #062029;
+      --good: #6fd6a0; --good-bg: #12281d; --bad: #ff9d9d; --bad-bg: #331a1a; --warn: #ffb454; --warn-bg: #2c2112; --chip: #202c38; --code-bg: #0a1016;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1318; --surface: #161f29; --ink: #e5ecf3; --muted: #9aa9b8; --line: #2b3947; --brand: #4cc3dc; --brand-ink: #062029;
+    --good: #6fd6a0; --good-bg: #12281d; --bad: #ff9d9d; --bad-bg: #331a1a; --warn: #ffb454; --warn-bg: #2c2112; --chip: #202c38; --code-bg: #0a1016;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  code, pre { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  :not(pre) > code { background: var(--chip); padding: 1px 6px; border-radius: 4px; font-size: .9em; }
+  a { color: var(--brand); }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  header.top { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); padding: 10px max(16px, 3vw); display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  header.top b { font-size: 17px; } header.top b span { color: var(--brand); }
+  header.top nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; flex: 1; }
+  .ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px max(16px, 3vw) 80px; }
+  section { margin: 0 0 44px; scroll-margin-top: 70px; }
+  h1 { font-size: 30px; margin: 0 0 6px; text-wrap: balance; } h2 { font-size: 24px; margin: 0 0 8px; text-wrap: balance; } h3 { font-size: 17px; margin: 22px 0 6px; }
+  p { margin: 0 0 12px; max-width: 72ch; } .lead { color: var(--muted); font-size: 18px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin: 14px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; } .card p { margin: 0; font-size: 14px; color: var(--muted); }
+  .card .n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-size: 12px; font-weight: 700; margin-right: 8px; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 10px 0; }
+  .pair > div { padding: 12px 14px; min-width: 0; }
+  .pair .no { background: var(--bad-bg); border-right: 1px solid var(--line); } .pair .yes { background: var(--good-bg); }
+  .pair .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+  .pair .no .tag { color: var(--bad); } .pair .yes .tag { color: var(--good); }
+  .pair p { margin: 0 0 6px; font-size: 14px; } .pair .why { grid-column: 1 / -1; padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); background: var(--surface); }
+  .pair pre { margin: 4px 0 0; padding: 8px 10px; background: var(--code-bg); color: var(--code-fg); border-radius: 6px; font-size: 12px; overflow-x: auto; }
+  @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } .pair .no { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+  .check-group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+  .check-group h3 { margin: 0 0 6px; }
+  .check-group label { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; cursor: pointer; font-size: 15px; }
+  .check-group input { margin-top: 5px; }
+  .check-group input:checked + span { color: var(--muted); text-decoration: line-through; }
+  .prog { font-weight: 700; margin: 6px 0; }
+  details.pit { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; padding: 0 14px; }
+  details.pit summary { cursor: pointer; padding: 12px 0; font-weight: 650; display: flex; gap: 10px; }
+  details.pit summary .pn { color: var(--brand); font-size: 13px; }
+  details.pit .body { padding: 0 0 14px; font-size: 15px; } details.pit .body p { margin: 0 0 8px; }
+  details.pit .lbl { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-top: 6px; }
+  .btn { background: var(--chip); color: var(--ink); border: 0; border-radius: 8px; padding: 7px 14px; font: inherit; font-weight: 650; cursor: pointer; }
+  .btn:disabled { opacity: .5; }
+  .tres { margin-top: 8px; font-size: 14px; }
+  .tres .t { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 650; }
+  .tres .t.ok { background: var(--good-bg); color: var(--good); } .tres .t.bad { background: var(--bad-bg); color: var(--bad); }
+  .note { border-left: 4px solid var(--warn); background: var(--warn-bg); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 76ch; font-size: 15px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; } th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; } th { background: var(--bg); font-size: 13px; } tr:last-child td { border-bottom: 0; }
+  .empty { color: var(--muted); font-size: 13px; font-style: italic; }
+  .k { color: var(--c-key); } .s { color: var(--c-str); } .w { color: var(--c-kw); }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <b>Remote control <span>best practices</span></b>
+  <nav aria-label="Sections"><a href="#rules">Golden rules</a><a href="#dodont">Do and don't</a><a href="#design">Design your app</a><a href="#checklist">Checklist</a><a href="#pitfalls">Pitfalls and tests</a><a href="#status">What is tested</a></nav>
+  <button class="ghost" id="theme" type="button">Theme</button>
+</header>
+
+<main>
+  <h1>What to do, and what not to do</h1>
+  <p class="lead">One page to read before you build, and to check against before you publish. Every item comes from testing a real app. The pitfalls at the bottom can run their own tests right here.</p>
+  <p>Looking for something to copy? The <code>kit</code> folder has a skeleton app, the separate remote-control files, publish settings and ready-made sentences for Claude. <a href="learn.html">learn.html</a> teaches the whole idea.</p>
+
+  <section id="rules">
+    <h2>Golden rules</h2>
+    <div class="grid" id="rules-grid"></div>
+  </section>
+
+  <section id="dodont">
+    <h2>Do and don't</h2>
+    <p>Each pair shows the habit that caused trouble and the one that fixed it.</p>
+    <div id="pairs"></div>
+  </section>
+
+  <section id="design">
+    <h2>Design your app to be remote-friendly</h2>
+    <div class="grid" id="design-grid"></div>
+  </section>
+
+  <section id="checklist">
+    <h2>Checklist</h2>
+    <p>Ticks are saved in this browser. Use it as a review before you publish and before you share.</p>
+    <div class="prog" id="prog" aria-live="polite"></div>
+    <div id="checks"></div>
+    <button class="ghost" id="reset-checks" type="button">Clear all ticks</button>
+  </section>
+
+  <section id="pitfalls">
+    <h2>Pitfalls, with live tests</h2>
+    <p>Open one to see what you would see, why it happens, and the fix. The button runs its real tests against the real bridge code.</p>
+    <div id="pit-list"></div>
+  </section>
+
+  <section id="status">
+    <h2>What has been tested, and what has not</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Area</th><th>Status</th><th>How</th></tr>
+      <tr><td>The bridge's behaviour</td><td>Tested</td><td><span id="count-tests">45</span> automated tests, including negative tests, against a stand-in database. 19 deliberate bugs were all caught by a test.</td></tr>
+      <tr><td>Real database, one person</td><td>Tested</td><td>Ping, hello, reading typed-but-unsubmitted text, disabled click, bad selector, invalid command, wait timeout, expired command, select and check, screenshot.</td></tr>
+      <tr><td>Private per-person channel</td><td>Tested</td><td>The <code>me</code> path resolved to the owner's id and the lease worked on the real database. Another person's access has not been tried.</td></tr>
+      <tr><td>Closed page reopened by Claude</td><td>Works, slowly</td><td>The first open request did nothing for about 100 seconds. After showing the artifact pane and opening again, the page loaded in about 25 seconds and ran the waiting command. Keep "open it yourself" as the fallback.</td></tr>
+      <tr><td>Opening another artifact</td><td>Tested</td><td>The page stayed loaded and visible.</td></tr>
+      <tr><td>Two different people at once</td><td>Not tested</td><td>Follows from the private-channel design. Try it with a second person.</td></tr>
+      <tr><td>Framework-controlled inputs (React and similar)</td><td>Not tested</td><td>The bridge uses the browser's native setter, which is the standard approach. Test it on your own page.</td></tr>
+      <tr><td>Very large apps and long pages</td><td>Not tested</td><td>Reads are capped. Use selectors to read less.</td></tr>
+    </table></div>
+  </section>
+</main>
+
+<script>/* ===================== REMOTE CONTROL BRIDGE v2 (keep) =====================
+   A per-user, private command channel stored in the app's shared db.
+   Paths (relative to `base`, for example "data/users/<your id>/rc"):
+     <base>/cmd/<id>      Claude writes  {status:"pending", steps:[...], expires?:epochMs}
+     <base>/res/<id>      page writes    {status, error, results:[...], t}
+     <base>/snap/<id>     page writes    {jpeg:"data:image/...", t}
+     <base>/meta/hello    page writes    {openedAt, holder, version, visibility}
+     <base>/meta/lock     page writes    {agent, state, since, lastActive, expiresAt}  (who is using the app; frees itself after lockIdleMs of inactivity)
+   A command may carry  agent:"name"  (a label), session:"<session id>" (stamped by the plugin hook, not by the model), sessionTitle, subagent:{id,type},
+   release:true (free the app when done), takeover:true (take it from another session). The lock is keyed on the session when there is one, else on the agent name.
+   If another agent holds the app, the command is not run and ends with status "busy". ping-only commands never take the lock.
+   Steps are plain data from a fixed action list. Nothing is eval'd.
+   Failure policy:
+     hard error  -> the command stops, status "error"      (missing element, disabled, timeout...)
+     soft failure -> the step reports ok:false and continues (screenshot unavailable)
+     warning     -> ok:true plus a "warning" field         (selector matched several elements)      */
+const BRIDGE_VERSION = "2.2";
+const BRIDGE_ACTIONS = ["ping", "inspect", "read", "fill", "click", "check", "select", "press", "wait", "wait_for", "text", "call", "screenshot"];
+
+function createBridge(opts) {
+  const o = Object.assign({
+    root: document, actions: {}, snapshot: null, stepDelayMs: 0,
+    onState() {}, onLog() {}, onLock() {}, highlight() {}, now: () => Date.now(),
+    holder: "tab-" + Math.random().toString(36).slice(2, 8),
+  }, opts);
+  const L = Object.assign({
+    maxSteps: 40, maxChars: 20000, maxResultBytes: 200000, maxSnapChars: 190000, maxSnaps: 10,
+    stepTimeoutMs: 150000, leaseMs: 60000, rescanMs: 5000, maxFieldChars: 2000, maxElements: 150, maxRows: 100, lockIdleMs: 120000, maxAgentChars: 60, requireAgent: false,
+  }, opts.limits || {});
+  const { db, base, root } = o;
+  const P = { cmd: base + "/cmd", res: base + "/res", snap: base + "/snap", hello: base + "/meta/hello", lock: base + "/meta/lock" };
+  const S = { who: {}, paused: false, stopped: false, snapIds: [], unsub: null, chain: Promise.resolve(), seen: new Set(), running: new Set() };
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const msg = (e) => String((e && e.message) || (e && e.code) || e);
+  const trunc = (s, n) => { s = String(s == null ? "" : s); return s.length > n ? { text: s.slice(0, n), truncated: true, length: s.length } : { text: s, truncated: false, length: s.length }; };
+  const doc = () => root.ownerDocument || root;
+  const win = () => doc().defaultView || window;
+  const visState = () => doc().visibilityState;
+  const withTimeout = (p, ms, label) => new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error(label + " timed out after " + ms + "ms")), ms);
+    p.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); });
+  });
+
+  /* ---------- who is using the app ---------- */
+  const agentOf = (d) => (typeof d.agent === "string" && d.agent.trim() ? d.agent.trim() : "unnamed");
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
+  const shortId = (s) => String(s).replace(/[^A-Za-z0-9]/g, "").slice(0, 8);
+  // who is calling: the session id (stamped by the hook) is the identity; the title and agent name are only for display
+  function whoOf(d) {
+    const sid = str(d.session), sub = d.subagent && typeof d.subagent === "object" ? str(d.subagent.id) : "";
+    const name = str(d.sessionTitle) || str(d.agent) || (d.subagent && str(d.subagent.type)) || "";
+    const key = sid ? "s:" + sid + (sub ? "/" + sub : "") : "a:" + agentOf(d);
+    const tag = sid ? shortId(sid) + (sub ? "/" + shortId(sub) : "") : "";
+    const label = name ? (tag ? name + " \u00b7 " + tag : name) : (tag || "unnamed");
+    return { key, label, verified: !!sid };
+  }
+  const logTag = (id) => (S.who[id] ? S.who[id] + "  " : "");
+  const sameWho = (l, w) => (l.key ? l.key === w.key : l.agent === w.label);
+  async function readLock() { try { const s = await db.doc(P.lock).get(); return s.exists ? s.data() : null; } catch (_) { return null; } }
+  const lockLive = (l) => !!(l && l.agent && Number(l.expiresAt) > o.now());
+  function lockInfo(l) {
+    if (!lockLive(l)) return { held: false };
+    return { held: true, agent: l.agent, state: l.state, since: l.since, idleMs: Math.max(0, o.now() - l.lastActive), expiresInMs: Math.max(0, l.expiresAt - o.now()) };
+  }
+  async function writeLock(l) { try { await db.doc(P.lock).set(l); } catch (e) { o.onLog("could not write the lock: " + msg(e)); } o.onLock(l); }
+  const touchedLock = (prev, w, cmd, state) => ({ agent: w.label, key: w.key, verified: w.verified, cmd, state, holder: o.holder, since: prev && lockLive(prev) && sameWho(prev, w) ? prev.since : o.now(), lastActive: o.now(), expiresAt: o.now() + L.lockIdleMs });
+
+  /* ---------- looking at the page ---------- */
+  function visible(el) {
+    if (!el || el.hidden || (el.closest && el.closest("[hidden]"))) return false;
+    if (el.getClientRects && el.getClientRects().length === 0) return false;
+    const cs = win().getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none";
+  }
+  const isDisabled = (el) => !!(el.disabled || el.getAttribute("aria-disabled") === "true");
+  function labelOf(el) {
+    const aria = el.getAttribute("aria-label"); if (aria) return aria.trim().slice(0, 80);
+    if (el.labels && el.labels.length) return el.labels[0].innerText.trim().slice(0, 80);
+    if (el.placeholder) return el.placeholder.slice(0, 80);
+    if (el.tagName === "INPUT" && /^(button|submit|reset)$/.test(el.type)) return String(el.value).slice(0, 80);
+    return (el.innerText || el.title || "").trim().replace(/\s+/g, " ").slice(0, 80);
+  }
+  function bestSelector(el) {
+    const esc = (s) => (win().CSS && win().CSS.escape ? win().CSS.escape(s) : String(s).replace(/[^\w-]/g, "\\$&"));
+    if (el.id) return "#" + esc(el.id);
+    const rc = el.getAttribute("data-rc"); if (rc) return '[data-rc="' + rc.replace(/"/g, '\\"') + '"]';
+    const nm = el.getAttribute("name"); if (nm) return el.tagName.toLowerCase() + '[name="' + nm.replace(/"/g, '\\"') + '"]';
+    const parts = []; let n = el;
+    while (n && n.nodeType === 1 && n !== root && parts.length < 4) {
+      if (n.id) { parts.unshift("#" + esc(n.id)); break; }
+      let part = n.tagName.toLowerCase();
+      const sib = n.parentElement ? [...n.parentElement.children].filter((c) => c.tagName === n.tagName) : [];
+      if (sib.length > 1) part += ":nth-of-type(" + (sib.indexOf(n) + 1) + ")";
+      parts.unshift(part); n = n.parentElement;
+    }
+    return parts.join(" > ");
+  }
+  function describe(el) {
+    const tag = el.tagName.toLowerCase(), type = tag === "input" ? (el.type || "text").toLowerCase() : undefined;
+    const d = { selector: bestSelector(el), tag };
+    if (type) d.type = type;
+    if (el.id) d.id = el.id;
+    const nm = el.getAttribute("name"); if (nm) d.name = nm;
+    d.label = labelOf(el);
+    if (tag === "input" || tag === "textarea" || tag === "select") {
+      if (type === "password") d.value = el.value ? "(hidden: password)" : "";
+      else if (type === "checkbox" || type === "radio") d.checked = !!el.checked;
+      else if (tag === "select") { d.value = el.value; d.selectedText = el.selectedOptions[0] ? el.selectedOptions[0].text : ""; d.options = [...el.options].slice(0, 50).map((op) => op.text); }
+      else { const t = trunc(el.value, L.maxFieldChars); d.value = t.text; if (t.truncated) d.valueLength = t.length; }
+    } else if (el.isContentEditable) { const t = trunc(el.innerText, L.maxFieldChars); d.value = t.text; }
+    if (tag === "a") d.href = el.getAttribute("href");
+    d.disabled = isDisabled(el);
+    d.visible = visible(el);
+    return d;
+  }
+  const CONTROLS = 'button,input,textarea,select,a[href],[role="button"],[contenteditable=""],[contenteditable="true"],[data-rc]';
+  function controlsOf(scope) {
+    const all = [...scope.querySelectorAll(CONTROLS)];
+    return { controls: all.slice(0, L.maxElements).map(describe), controlsTotal: all.length, controlsTruncated: all.length > L.maxElements };
+  }
+  const defaultScope = () => root.querySelector("#app") || root.body || root;
+  function readScope(scope) {
+    const t = trunc(scope.innerText != null ? scope.innerText : scope.textContent, L.maxChars);
+    const lists = [...scope.querySelectorAll("ul,ol")].filter(visible).slice(0, 20).map((ul) => ({
+      selector: bestSelector(ul),
+      items: [...ul.children].filter((li) => li.tagName === "LI" && visible(li)).slice(0, L.maxRows).map((li) => trunc(li.innerText.trim().replace(/\s+/g, " "), 300).text),
+    }));
+    const tables = [...scope.querySelectorAll("table")].filter(visible).slice(0, 10).map((tb) => ({
+      selector: bestSelector(tb),
+      rows: [...tb.rows].slice(0, L.maxRows).map((r) => [...r.cells].slice(0, 30).map((c) => trunc(c.innerText.trim(), 200).text)),
+    }));
+    return Object.assign({ title: doc().title || "", text: t.text, textTruncated: t.truncated, lists, tables }, controlsOf(scope));
+  }
+
+  /* ---------- finding and acting ---------- */
+  function one(step, o2) {
+    if (typeof step.selector !== "string" || !step.selector) throw new Error('"selector" is required for ' + step.action);
+    let list; try { list = [...root.querySelectorAll(step.selector)]; } catch (_) { throw new Error("Invalid selector: " + step.selector); }
+    if (!list.length) throw new Error("No element matches " + step.selector);
+    let i = 0;
+    if (step.index !== undefined) { i = Number(step.index); if (!Number.isInteger(i) || i < 0 || i >= list.length) throw new Error("index " + step.index + " is out of range (" + list.length + " matches)"); }
+    const el = list[i];
+    if (o2 && o2.needVisible && !step.force && !visible(el)) throw new Error("Element is not visible: " + step.selector + " (add force:true to act anyway)");
+    o.highlight(el);
+    const out = { el, matches: list.length };
+    if (list.length > 1 && step.index === undefined) out.warning = "Selector matched " + list.length + " elements; used the first. Add index or a more specific selector.";
+    return out;
+  }
+  function setNative(el, v) {
+    const W = win();
+    const proto = el.tagName === "TEXTAREA" ? W.HTMLTextAreaElement.prototype : el.tagName === "SELECT" ? W.HTMLSelectElement.prototype : W.HTMLInputElement.prototype;
+    const d = Object.getOwnPropertyDescriptor(proto, "value");
+    if (d && d.set) d.set.call(el, v); else el.value = v;      // the native setter makes React-style controlled inputs notice
+  }
+  function fire(el, type, init) {
+    const W = win(), E = type === "input" && W.InputEvent ? W.InputEvent : W.Event;
+    el.dispatchEvent(new E(type, Object.assign({ bubbles: true }, init)));
+  }
+  const withWarn = (r, w) => (w ? Object.assign(r, { warning: w }) : r);
+
+  async function runStep(step, ctx) {
+    switch (step.action) {
+      case "ping":
+        return { ok: true, pong: true, t: o.now(), visibility: visState(), version: BRIDGE_VERSION, holder: o.holder, lock: lockInfo(await readLock()) };
+
+      case "inspect": {
+        const f = step.selector ? one(step) : { el: defaultScope() };
+        return Object.assign({ ok: true }, controlsOf(f.el));
+      }
+      case "read": {
+        const f = step.selector ? one(step) : { el: defaultScope() };
+        return Object.assign({ ok: true }, readScope(f.el));
+      }
+      case "fill": {
+        const f = one(step, { needVisible: true }), el = f.el;
+        if (step.value === undefined) throw new Error('"value" is required for fill');
+        const v = String(step.value), type = (el.type || "").toLowerCase();
+        if (isDisabled(el)) throw new Error("Element is disabled: " + step.selector);
+        if (el.readOnly) throw new Error("Element is read-only: " + step.selector);
+        if (el.tagName === "SELECT") throw new Error('Use "select" for a dropdown');
+        if (el.tagName === "INPUT" && /^(checkbox|radio|button|submit|reset|file|image)$/.test(type)) throw new Error('fill cannot set an input of type "' + type + '". Use check or click.');
+        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") { el.focus(); setNative(el, v); }
+        else if (el.isContentEditable) { el.focus(); el.textContent = v; }
+        else throw new Error("Element is not a text field: " + step.selector);
+        fire(el, "input", { data: v, inputType: "insertText" }); fire(el, "change");
+        const actual = el.isContentEditable && el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" ? el.innerText : el.value;
+        const accepted = actual === v, t = trunc(actual, 200);
+        return withWarn({ ok: true, matches: f.matches, accepted, value: t.text, valueLength: actual.length },
+          f.warning || (accepted ? null : "The field changed the value (length, type or pattern rules). Check value."));
+      }
+      case "click": {
+        const f = one(step, { needVisible: true });
+        if (isDisabled(f.el)) throw new Error("Element is disabled: " + step.selector);
+        f.el.click(); await sleep(30);
+        return withWarn({ ok: true, matches: f.matches }, f.warning);
+      }
+      case "check": {
+        const f = one(step, { needVisible: true }), el = f.el;
+        if (!(el.tagName === "INPUT" && /^(checkbox|radio)$/.test(el.type))) throw new Error("check needs a checkbox or radio button");
+        if (isDisabled(el)) throw new Error("Element is disabled: " + step.selector);
+        const want = step.checked === undefined ? true : !!step.checked;
+        if (el.checked !== want) { el.click(); await sleep(30); }
+        if (el.checked !== want) throw new Error("Could not set checked=" + want + " on " + step.selector);
+        return withWarn({ ok: true, checked: el.checked }, f.warning);
+      }
+      case "select": {
+        const f = one(step, { needVisible: true }), el = f.el;
+        if (el.tagName !== "SELECT") throw new Error("select needs a <select> element");
+        if (isDisabled(el)) throw new Error("Element is disabled: " + step.selector);
+        const by = step.value !== undefined ? (op) => op.value === String(step.value) : step.label !== undefined ? (op) => op.text.trim() === String(step.label).trim() : null;
+        if (!by) throw new Error('select needs "value" or "label"');
+        const op = [...el.options].find(by);
+        if (!op || op.disabled) throw new Error("No selectable option matches. Options: " + [...el.options].map((x) => JSON.stringify(x.text)).join(", "));
+        setNative(el, op.value); fire(el, "input"); fire(el, "change");
+        return withWarn({ ok: true, value: el.value, selectedText: el.selectedOptions[0].text }, f.warning);
+      }
+      case "press": {
+        if (typeof step.key !== "string" || !step.key) throw new Error('"key" is required for press');
+        let target;
+        if (step.selector) { target = one(step, { needVisible: true }).el; target.focus(); } else target = doc().activeElement || doc().body;
+        const init = { key: step.key, code: step.key.length === 1 ? "Key" + step.key.toUpperCase() : step.key, bubbles: true, cancelable: true };
+        target.dispatchEvent(new (win().KeyboardEvent)("keydown", init));
+        target.dispatchEvent(new (win().KeyboardEvent)("keyup", init));
+        await sleep(30);
+        return { ok: true, synthetic: true, note: "Synthetic key events run the page's handlers but not browser defaults such as submitting a form. Click the submit button instead." };
+      }
+      case "wait": {
+        const ms = Number(step.ms);
+        if (!Number.isFinite(ms) || ms < 0) throw new Error('"ms" must be a number');
+        await sleep(Math.min(ms, 10000)); return { ok: true, waitedMs: Math.min(ms, 10000) };
+      }
+      case "wait_for": {
+        if (typeof step.selector !== "string" || !step.selector) throw new Error('"selector" is required for wait_for');
+        const limit = Math.min(Number(step.timeoutMs) || 15000, 120000), t0 = o.now();
+        for (;;) {
+          let list; try { list = [...root.querySelectorAll(step.selector)]; } catch (_) { throw new Error("Invalid selector: " + step.selector); }
+          const vis = list.filter(visible);
+          const textOk = !step.textIncludes || vis.some((e) => String(e.innerText || "").includes(step.textIncludes) || String(e.value || "").includes(step.textIncludes));
+          if (step.gone ? vis.length === 0 : (vis.length > 0 && textOk)) return { ok: true, waitedMs: o.now() - t0 };
+          if (o.now() - t0 >= limit) throw new Error("Timed out after " + limit + "ms waiting for " + step.selector + (step.gone ? " to disappear" : " to appear") + (step.textIncludes ? ' with text "' + step.textIncludes + '"' : ""));
+          await sleep(100);
+        }
+      }
+      case "text": {
+        const f = one(step), el = f.el, isField = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+        const t = trunc(isField ? el.value : (el.innerText != null ? el.innerText : el.textContent), L.maxChars);
+        const r = { ok: true, matches: f.matches, text: t.text, truncated: t.truncated, length: t.length, visible: visible(el) };
+        if (isField) r.source = "value";
+        else {
+          const typed = [...el.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=password]),textarea')].filter((x) => x.value).length;
+          if (typed) r.note = typed + " field(s) inside have typed values that text does not include. Use read to see them.";
+          if (!r.visible) r.note = (r.note ? r.note + " " : "") + "The element is hidden, so its text may be empty.";
+        }
+        return withWarn(r, f.warning);
+      }
+      case "call": {
+        const fn = o.actions && o.actions[step.name];
+        if (typeof fn !== "function") throw new Error("No registered action: " + step.name + ". Registered: " + Object.keys(o.actions || {}).join(", "));
+        if (step.args !== undefined && (typeof step.args !== "object" || step.args === null || Array.isArray(step.args))) throw new Error('"args" must be an object');
+        const result = await fn(step.args || {}, { cmdId: ctx.cmdId });
+        let s; try { s = JSON.stringify(result === undefined ? null : result); } catch (e) { throw new Error("Action result is not JSON-serializable: " + msg(e)); }
+        if (s.length > L.maxChars) throw new Error("Action result is too large (" + s.length + " characters; the limit is " + L.maxChars + ")");
+        return { ok: true, name: step.name, result: JSON.parse(s) };
+      }
+      case "screenshot": {
+        if (typeof o.snapshot !== "function") return { ok: false, reason: "screenshots are not available in this page" };
+        const target = step.selector ? one(step).el : null;
+        let url; try { url = await o.snapshot(target); } catch (e) { return { ok: false, reason: "capture failed: " + msg(e) }; }
+        if (typeof url !== "string" || url.indexOf("data:") !== 0) return { ok: false, reason: "capture produced no image" };
+        if (url.length > L.maxSnapChars) return { ok: false, reason: "image too large (" + url.length + " characters; limit " + L.maxSnapChars + "). Try a selector for a smaller area." };
+        const id = ctx.cmdId + "_" + (ctx.n++);
+        await db.doc(P.snap + "/" + id).set({ jpeg: url, t: o.now() });
+        S.snapIds.push(id);
+        while (S.snapIds.length > L.maxSnaps) { try { await db.doc(P.snap + "/" + S.snapIds.shift()).delete(); } catch (_) {} }
+        return { ok: true, snap: id, bytes: url.length };
+      }
+      default: throw new Error('Unknown action "' + step.action + '"');
+    }
+  }
+
+  /* ---------- commands ---------- */
+  function validate(data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return "The command is not an object";
+    if (!Array.isArray(data.steps)) return '"steps" must be a list';
+    if (!data.steps.length) return '"steps" is empty';
+    if (data.steps.length > L.maxSteps) return "Too many steps (" + data.steps.length + "). The limit is " + L.maxSteps;
+    for (let i = 0; i < data.steps.length; i++) {
+      const s = data.steps[i];
+      if (!s || typeof s !== "object" || Array.isArray(s)) return "Step " + (i + 1) + " is not an object";
+      if (typeof s.action !== "string") return "Step " + (i + 1) + ' has no "action"';
+      if (BRIDGE_ACTIONS.indexOf(s.action) < 0) return "Step " + (i + 1) + ': unknown action "' + s.action + '". Known actions: ' + BRIDGE_ACTIONS.join(", ");
+    }
+    if (data.expires !== undefined && !Number.isFinite(Number(data.expires))) return '"expires" must be a number (epoch milliseconds)';
+    if (L.requireAgent && !(typeof data.agent === "string" && data.agent.trim()) && !(typeof data.session === "string" && data.session.trim())) return 'This app needs to know who you are. Put your session name in the "agent" field (the title of your Claude session), for example "agent":"Sales report helper". With the remote-control plugin installed, the session id is added for you.';
+    for (const k of ["session", "sessionTitle"]) if (data[k] !== undefined && (typeof data[k] !== "string" || data[k].length > 120)) return '"' + k + '" must be a short text';
+    if (data.subagent !== undefined && (!data.subagent || typeof data.subagent !== "object" || Array.isArray(data.subagent))) return '"subagent" must be an object like {"id":"...","type":"..."}';
+    if (data.agent !== undefined && (typeof data.agent !== "string" || data.agent.length > L.maxAgentChars)) return '"agent" must be a short text (at most ' + L.maxAgentChars + " characters)";
+    for (const k of ["release", "takeover"]) if (data[k] !== undefined && typeof data[k] !== "boolean") return '"' + k + '" must be true or false';
+    return null;
+  }
+
+  async function finish(id, ref, status, error, results, extra) {
+    const res = Object.assign({ status, error: error || null, results: results || [], t: o.now(), holder: o.holder }, extra || {});
+    const size = JSON.stringify(res).length;
+    if (size > L.maxResultBytes) {
+      res.results = res.results.map((r) => ({ step: r.step, action: r.action, ok: r.ok, error: r.error }));
+      res.error = (res.error ? res.error + " | " : "") + "The full results were too large (" + size + " bytes) and were dropped. Ask for less, for example read with a selector.";
+      if (res.status === "done") res.status = "error";
+    }
+    try { await db.doc(P.res + "/" + id).set(res); }
+    catch (e) { try { await db.doc(P.res + "/" + id).set({ status: "error", error: "Could not save the result: " + msg(e), results: [], t: o.now() }); } catch (_) {} }
+    try { await ref.update({ status: res.status }); } catch (_) {}
+    o.onLog(logTag(id) + id + " " + res.status + (res.error ? ": " + res.error : ""));
+  }
+
+  async function execute(snap) {
+    const id = snap.id;
+    if (S.seen.has(id)) return;
+    S.seen.add(id);
+    const ref = db.doc(P.cmd + "/" + id);
+    let data, who = null, held = false;
+    try {
+      const lease = await ref.acquire({ holder: o.holder, ttlMs: L.leaseMs });            // one tab at a time
+      if (!lease.acquired) { o.onLog(id + ": another tab is handling it"); return; }
+      const fresh = await ref.get();
+      if (!fresh.exists || (fresh.data() || {}).status !== "pending") return;
+      data = fresh.data();
+    } catch (e) {
+      o.onLog(id + ": could not claim it (" + msg(e) + "). Will look again soon.");
+      S.seen.delete(id); setTimeout(rescan, L.rescanMs); return;
+    }
+    S.running.add(id);
+    const renew = setInterval(() => { ref.acquire({ holder: o.holder, ttlMs: L.leaseMs }).catch(() => {}); }, Math.max(500, L.leaseMs / 2));
+    const renewLock = setInterval(() => { if (held) readLock().then((l) => { if (l && sameWho(l, who)) writeLock(touchedLock(l, who, id, "running")); }); }, Math.max(100, L.lockIdleMs / 3));
+    try {
+      const bad = validate(data);
+      if (bad) return await finish(id, ref, "invalid", bad, []);
+      if (data.expires !== undefined && o.now() > Number(data.expires)) return await finish(id, ref, "expired", "It expired before it ran", []);
+      while (S.paused && !S.stopped) await sleep(200);
+      if (S.stopped) return;
+      who = whoOf(data); S.who[id] = who.label;
+      if (!data.steps.every((s) => s.action === "ping")) {                 // ping-only commands just look; they never take the app
+        const prev = await readLock();
+        if (lockLive(prev) && !sameWho(prev, who) && !data.takeover) {
+          const li = lockInfo(prev);
+          return await finish(id, ref, "busy", 'The app is in use by session "' + prev.agent + '" (' + (prev.state === "running" ? "working now" : "idle for " + Math.round(li.idleMs / 1000) + "s") + "). It frees itself in " + Math.round(li.expiresInMs / 1000) + 's, or when that session sends release:true. Wait and send again, or use takeover:true only if the person says so. Nothing was run.', [], { lock: li });
+        }
+        if (lockLive(prev) && !sameWho(prev, who)) o.onLog(who.label + " took the app over from " + prev.agent);
+        await writeLock(touchedLock(prev, who, id, "running")); held = true;
+      }
+      await ref.update({ status: "running", startedAt: o.now(), holder: o.holder });
+      o.onState("running", id); o.onLog(logTag(id) + id + " started (" + data.steps.length + " steps)");
+      const results = [], ctx = { cmdId: id, n: 1 };
+      let status = "done", error = null;
+      for (let i = 0; i < data.steps.length; i++) {
+        while (S.paused && !S.stopped) await sleep(200);
+        if (S.stopped) { status = "interrupted"; error = "The bridge was stopped"; break; }
+        const s = data.steps[i];
+        if (o.stepDelayMs) await sleep(o.stepDelayMs);
+        const t0 = o.now();
+        try {
+          const r = await withTimeout(runStep(s, ctx), L.stepTimeoutMs, "Step " + (i + 1));
+          results.push(Object.assign({ step: i, action: s.action, ms: o.now() - t0 }, r));
+        } catch (e) {
+          results.push({ step: i, action: s.action, ok: false, error: msg(e), ms: o.now() - t0 });
+          if (s.optional) continue;
+          status = "error"; error = "Step " + (i + 1) + " (" + s.action + "): " + msg(e); break;
+        }
+      }
+      await finish(id, ref, status, error, results);
+    } catch (e) {
+      o.onLog(id + ": unexpected error " + msg(e));
+      await finish(id, ref, "error", "Unexpected error: " + msg(e), []);
+    } finally {
+      clearInterval(renew); clearInterval(renewLock); S.running.delete(id); setTimeout(() => { delete S.who[id]; }, 2000);
+      if (held) {                                               // the idle clock starts when the command ends
+        try {
+          if (data && data.release) { await db.doc(P.lock).delete(); o.onLock(null); o.onLog(who.label + " released the app"); }
+          else await writeLock(touchedLock(await readLock(), who, id, "idle"));
+        } catch (_) {}
+      }
+      o.onState(S.paused ? "paused" : "on", "waiting for commands");
+    }
+  }
+
+  /* ---------- lifecycle ---------- */
+  function enqueue(d) { S.chain = S.chain.then(() => execute(d)).catch((e) => o.onLog("bridge error: " + msg(e))); }
+  async function rescan() {
+    if (S.stopped) return;
+    try { const snap = await db.collection(P.cmd).where("status", "==", "pending").get(); snap.docs.forEach((d) => { if (!S.seen.has(d.id)) enqueue(d); }); }
+    catch (e) { o.onLog("rescan failed: " + msg(e)); }
+  }
+  async function recover() {                                  // commands left "running" by a page that closed
+    if (S.stopped) return;
+    try {
+      const snap = await db.collection(P.cmd).where("status", "==", "running").get();
+      for (const d of snap.docs) {
+        if (S.running.has(d.id)) continue;
+        const ref = db.doc(P.cmd + "/" + d.id);
+        const lease = await ref.acquire({ holder: o.holder, ttlMs: 1000 }).catch(() => ({ acquired: false }));
+        if (!lease.acquired) continue;                         // somebody is still working on it
+        const has = await db.doc(P.res + "/" + d.id).get();
+        if (!has.exists) await db.doc(P.res + "/" + d.id).set({ status: "interrupted", error: "The page was closed or reloaded while this command was running. It was not retried because it may have partly run.", results: [], t: o.now(), holder: o.holder });
+        await ref.update({ status: "interrupted" });
+        o.onLog(d.id + " marked interrupted");
+      }
+    } catch (e) { o.onLog("recover failed: " + msg(e)); }
+  }
+  async function start() {
+    try { await db.doc(P.hello).set({ openedAt: o.now(), holder: o.holder, version: BRIDGE_VERSION, visibility: visState() }); }
+    catch (e) { o.onState("off", "cannot write to your private channel (" + msg(e) + "). You may have view-only access."); return false; }
+    o.onState("on", "waiting for commands");
+    S.unsub = db.collection(P.cmd).where("status", "==", "pending").onSnapshot(
+      (snap) => snap.docChanges().filter((c) => c.type === "added").forEach((c) => enqueue(c.doc)),
+      (err) => o.onState("error", "subscription ended: " + msg(err)));
+    recover(); setTimeout(recover, L.leaseMs + 2000);
+    return true;
+  }
+  function pause(b) { S.paused = !!b; o.onState(S.paused ? "paused" : "on", S.paused ? "commands wait until you resume" : "waiting for commands"); }
+  function stop() { S.stopped = true; if (S.unsub) { try { S.unsub(); } catch (_) {} } }
+
+  return { start, stop, pause, validate, runStep: (s) => runStep(s, { cmdId: "manual", n: 1 }), paths: P, readLock, lockInfo: async () => lockInfo(await readLock()), holder: o.holder, version: BRIDGE_VERSION, limits: L };
+}
+
+/* Optional helper: turn the page (or one element) into a small JPEG data URL with html2canvas. */
+function makeHtml2canvasSnapshot(defaultTarget, o2) {
+  const cfg = Object.assign({ maxWidth: 900, maxChars: 180000 }, o2);
+  return async function (target) {
+    if (typeof html2canvas !== "function") return null;
+    let c = await html2canvas(target || defaultTarget || document.body, { backgroundColor: getComputedStyle(document.body).backgroundColor, scale: 1, logging: false });
+    if (c.width > cfg.maxWidth) {
+      const out = document.createElement("canvas"); out.width = cfg.maxWidth; out.height = Math.round(c.height * cfg.maxWidth / c.width);
+      out.getContext("2d").drawImage(c, 0, 0, out.width, out.height); c = out;
+    }
+    for (const q of [0.75, 0.55, 0.4, 0.3]) { const u = c.toDataURL("image/jpeg", q); if (u.length < cfg.maxChars) return u; }
+    return null;
+  };
+}
+/* ===================== END REMOTE CONTROL BRIDGE ===================== */
+</script>
+<script>/* A tiny in-memory stand-in for the Claude app database, used by the playground and the stress tests.
+   It follows the same rules the real db enforces where they matter for the bridge:
+     - document paths have an even number of segments, collection paths an odd number
+     - update() needs an existing document
+     - documents are capped at 256 KiB
+     - acquire() is a lease: set-if-not-busy, renewable only by the same holder
+   It is NOT the real db. The published template is also tested against the real db. */
+function createFakeDb(opts) {
+  opts = opts || {};
+  const store = new Map();   // path -> { data, version }
+  const leases = new Map();  // path -> { holder, expires }
+  const subs = new Set();
+  const listeners = new Set();
+  const delay = opts.delayMs || 0;
+  const now = opts.now || (() => Date.now());
+  const faults = { writeError: null };
+  const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  const err = (code, message) => Object.assign(new Error(message), { code });
+  const idOf = (p) => p.slice(p.lastIndexOf("/") + 1);
+  const parentOf = (p) => p.slice(0, p.lastIndexOf("/"));
+  const depth = (p) => p.split("/").length;
+  const autoId = () => "a" + Math.random().toString(36).slice(2, 10);
+  const wait = () => (delay ? new Promise((r) => setTimeout(r, delay)) : Promise.resolve());
+  function check(p, isDoc) {
+    if (typeof p !== "string" || !p || p[0] === "/" || p[p.length - 1] === "/") throw new TypeError("Bad path: " + p);
+    const even = depth(p) % 2 === 0;
+    if (isDoc !== even) throw new TypeError((isDoc ? "A document" : "A collection") + " path needs an " + (isDoc ? "even" : "odd") + " number of segments: " + p);
+  }
+  function merge(a, b) {
+    const out = Object.assign({}, a);
+    for (const k of Object.keys(b)) {
+      const x = out[k], y = b[k];
+      if (y && typeof y === "object" && !Array.isArray(y) && x && typeof x === "object" && !Array.isArray(x)) out[k] = merge(x, y);
+      else out[k] = clone(y);
+    }
+    return out;
+  }
+  function changed() { listeners.forEach((h) => { try { h(); } catch (_) {} }); subs.forEach((s) => s.fire()); }
+  function write(path, fn) {
+    if (faults.writeError) throw faults.writeError;
+    const old = store.get(path), data = fn(old && old.data);
+    if (JSON.stringify(data).length > 262144) throw err("invalid_argument", "A document is limited to 256 KiB");
+    store.set(path, { data, version: (old ? old.version : 0) + 1 });
+    changed();
+  }
+  function docSnap(path) {
+    const e = store.get(path);
+    return { id: idOf(path), exists: !!e, data: () => (e ? clone(e.data) : undefined), metadata: { fromCache: false, hasPendingWrites: false } };
+  }
+  function matches(data, f) {
+    const x = data[f[0]], v = f[2];
+    switch (f[1]) {
+      case "==": case "=": return x === v;
+      case "!=": return x !== v;
+      case "<": return x < v; case "<=": return x <= v; case ">": return x > v; case ">=": return x >= v;
+      case "in": return Array.isArray(v) && v.indexOf(x) >= 0;
+      case "not-in": return Array.isArray(v) && v.indexOf(x) < 0;
+      case "array-contains": return Array.isArray(x) && x.indexOf(v) >= 0;
+      default: throw err("invalid_argument", "Unknown operator " + f[1]);
+    }
+  }
+  function runQuery(path, filters, order, lim) {
+    let rows = [...store.entries()].filter(([p]) => parentOf(p) === path && depth(p) === depth(path) + 1 && filters.every((f) => matches(store.get(p).data, f)));
+    if (order) rows.sort((a, b) => { const x = a[1].data[order.f], y = b[1].data[order.f]; return (x > y ? 1 : x < y ? -1 : 0) * (order.d === "desc" ? -1 : 1); });
+    else rows.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    if (lim) rows = rows.slice(0, lim);
+    return rows.map((r) => r[0]);
+  }
+  function buildSnap(paths, prev) {
+    const cur = new Map(paths.map((p) => [p, JSON.stringify(store.get(p).data)]));
+    const changes = [];
+    paths.forEach((p, i) => { if (!prev || !prev.has(p)) changes.push({ type: "added", doc: docSnap(p), oldIndex: -1, newIndex: i }); else if (prev.get(p) !== cur.get(p)) changes.push({ type: "modified", doc: docSnap(p), oldIndex: i, newIndex: i }); });
+    if (prev) prev.forEach((_, p) => { if (!cur.has(p)) changes.push({ type: "removed", doc: Object.assign(docSnap(p), { exists: true }), oldIndex: 0, newIndex: -1 }); });
+    return { cur, snap: { docs: paths.map(docSnap), size: paths.length, empty: !paths.length, metadata: { fromCache: false, hasPendingWrites: false }, docChanges: () => changes } };
+  }
+  function docRef(path) {
+    check(path, true);
+    return {
+      id: idOf(path), path,
+      async get() { await wait(); return docSnap(path); },
+      async set(data) { await wait(); write(path, () => clone(data)); },
+      async update(data) { await wait(); if (!store.has(path)) throw err("invalid_argument", "update needs an existing document: " + path); write(path, (old) => merge(old, data)); },
+      async delete() { await wait(); if (faults.writeError) throw faults.writeError; store.delete(path); changed(); },
+      async acquire(o) {
+        await wait();
+        if (faults.writeError) throw faults.writeError;
+        o = o || {};
+        const ttl = Math.min(Math.max(o.ttlMs || 30000, 1000), 600000), l = leases.get(path), t = now();
+        if (l && l.expires > t && l.holder !== o.holder) return { acquired: false, expiresAt: new Date(l.expires).toISOString() };
+        leases.set(path, { holder: o.holder, expires: t + ttl });
+        if (o.data) write(path, (old) => merge(old || {}, o.data));
+        const e = store.get(path);
+        return { acquired: true, version: e ? e.version : undefined, expiresAt: new Date(t + ttl).toISOString(), holder: o.holder };
+      },
+      collection(sub) { return colRef(path + "/" + sub); },
+      onSnapshot(next, error) {
+        let last = null, dead = false;
+        const sub = { fire() { if (dead) return; const s = JSON.stringify(store.has(path) ? store.get(path).data : null); if (s === last) return; last = s; setTimeout(() => { if (!dead) next(docSnap(path)); }, delay); } };
+        subs.add(sub); setTimeout(() => sub.fire(), 0);
+        return () => { dead = true; subs.delete(sub); };
+      },
+    };
+  }
+  function colRef(path) {
+    check(path, false);
+    const q = (filters, order, lim) => ({
+      path,
+      where(f, op, v) { return q(filters.concat([[f, op, v]]), order, lim); },
+      orderBy(f, d) { return q(filters, { f, d: d || "asc" }, lim); },
+      limit(n) { return q(filters, order, n); },
+      async get() { await wait(); return buildSnap(runQuery(path, filters, order, lim), null).snap; },
+      onSnapshot(next, error) {
+        let prev = null, dead = false;
+        const sub = { fire() {
+          if (dead) return;
+          const b = buildSnap(runQuery(path, filters, order, lim), prev);
+          if (prev && !b.snap.docChanges().length) return;
+          prev = b.cur;
+          setTimeout(() => { if (!dead) next(b.snap); }, delay);
+        } };
+        subs.add(sub); setTimeout(() => sub.fire(), 0);
+        return () => { dead = true; subs.delete(sub); };
+      },
+      doc(id) { return docRef(path + "/" + (id || autoId())); },
+      async add(data) { const r = docRef(path + "/" + autoId()); await r.set(data); return r; },
+    });
+    return q([], null, null);
+  }
+  return {
+    doc: docRef, collection: colRef, faults,
+    onChange(h) { listeners.add(h); return () => listeners.delete(h); },
+    dump() { const o = {}; store.forEach((e, p) => { o[p] = clone(e.data); }); return o; },
+  };
+}
+</script>
+<script>/* The demo app: a small task list. It is deliberately full of the things real apps have:
+   typed-but-unsubmitted fields, a multi-line note, a dropdown, a checkbox, a button that starts disabled,
+   a hidden panel, repeated buttons (one Remove per task) and slow work (Sync). */
+function mountDemoApp(root, o) {
+  o = Object.assign({ syncMs: 1800 }, o);
+  const q = (s) => root.querySelector(s);
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const tasks = [];
+  function render() {
+    q("#list").innerHTML = tasks.map((t, i) =>
+      "<li><span>" + esc(t.text) + "</span> <small>[" + esc(t.category) + (t.urgent ? ", urgent" : "") + "]</small>" +
+      (t.note ? "<br><small>" + esc(t.note) + "</small>" : "") +
+      ' <button class="remove" type="button" data-i="' + i + '">Remove</button></li>').join("");
+    q("#count").textContent = tasks.length + " task" + (tasks.length === 1 ? "" : "s");
+    q("#clear").disabled = !tasks.length;
+  }
+  function add(t) {
+    const text = String(t.text || "").trim();
+    if (!text) return false;
+    tasks.push({ text, note: String(t.note || "").trim(), category: t.category || "Home", urgent: !!t.urgent });
+    render(); return true;
+  }
+  q("#add").addEventListener("click", () => {
+    if (add({ text: q("#item").value, note: q("#note").value, category: q("#category").value, urgent: q("#urgent").checked })) {
+      q("#item").value = ""; q("#note").value = ""; q("#urgent").checked = false;
+    }
+  });
+  q("#item").addEventListener("keydown", (e) => { if (e.key === "Enter") q("#add").click(); });
+  q("#list").addEventListener("click", (e) => { const b = e.target.closest(".remove"); if (b) { tasks.splice(+b.dataset.i, 1); render(); } });
+  q("#clear").addEventListener("click", () => { tasks.length = 0; render(); });
+  q("#toggle").addEventListener("click", () => { q("#details").hidden = !q("#details").hidden; });
+  q("#sync").addEventListener("click", () => {
+    const b = q("#sync"); b.disabled = true; q("#synced").hidden = true; q("#syncing").hidden = false;
+    setTimeout(() => { q("#syncing").hidden = true; q("#synced").hidden = false; b.disabled = false; }, o.syncMs);
+  });
+  render();
+  return {
+    tasks,
+    actions: {
+      addTask: async (a) => ({ added: add(a || {}), total: tasks.length }),
+      getState: async () => ({ tasks: JSON.parse(JSON.stringify(tasks)) }),
+    },
+  };
+}
+</script>
+<script>const DEMO_APP_HTML = "<h2 class=\"demo-title\">Task list</h2>\n<div id=\"form\">\n  <div class=\"field\"><label for=\"item\">Task</label><input id=\"item\" type=\"text\" placeholder=\"What needs doing?\"></div>\n  <div class=\"field\"><label for=\"note\">Note</label><textarea id=\"note\" rows=\"2\" placeholder=\"Optional details\"></textarea></div>\n  <div class=\"row\">\n    <label for=\"category\">Category</label>\n    <select id=\"category\"><option>Home</option><option>Work</option><option>Errands</option></select>\n    <label class=\"chk\"><input id=\"urgent\" type=\"checkbox\"> Urgent</label>\n    <button id=\"add\" type=\"button\">Add task</button>\n  </div>\n</div>\n<ul id=\"list\"></ul>\n<div class=\"row\">\n  <button id=\"sync\" type=\"button\">Sync</button><span id=\"syncing\" hidden>Syncing...</span><span id=\"synced\" hidden>Synced ✓</span>\n  <button id=\"clear\" type=\"button\" disabled>Clear all</button>\n  <button id=\"toggle\" type=\"button\">Details</button>\n</div>\n<div id=\"details\" hidden>Tasks are kept in memory only. Reload the page and they are gone.</div>\n<p id=\"count\" class=\"muted\">0 tasks</p>\n";</script>
+<script>/* Stress and negative tests for the remote-control bridge.
+   Each test builds a fresh demo app + fake db + bridge, sends real command documents, and checks what came back.
+   Needs globals: createBridge, createFakeDb, mountDemoApp, DEMO_APP_HTML. */
+const TEST_BASE = "data/users/u1/rc";
+
+function makeEnv(opts) {
+  opts = opts || {};
+  const host = document.createElement("div");
+  host.style.cssText = "position:absolute;left:-9999px;top:0;width:520px";
+  host.innerHTML = '<div id="app">' + DEMO_APP_HTML + "</div>";
+  document.body.appendChild(host);
+  const root = host.querySelector("#app");
+  const app = mountDemoApp(root, { syncMs: 300 });
+  const db = createFakeDb({ delayMs: opts.delayMs || 0 });   // a small delay makes tabs genuinely overlap
+  const logs = [], states = [];
+  const actions = Object.assign({}, app.actions, opts.actions);
+  const make = (holder) => createBridge({
+    db, base: TEST_BASE, root, actions, snapshot: opts.snapshot, limits: opts.limits, holder,
+    onLog: (l) => logs.push(l), onState: (s, d) => states.push([s, d]),
+  });
+  const bridges = [make(opts.holder || "tab-A")];
+  let seq = 0;
+  const env = {
+    root, app, db, logs, states, bridge: bridges[0], tasks: app.tasks,
+    q: (s) => root.querySelector(s),
+    addBridge(holder) { const b = make(holder); bridges.push(b); return b; },
+    async send(steps, extra) { const id = "c" + String(++seq).padStart(3, "0"); await db.doc(TEST_BASE + "/cmd/" + id).set(Object.assign({ status: "pending", steps }, extra)); return id; },
+    async sendRaw(data) { const id = "c" + String(++seq).padStart(3, "0"); await db.doc(TEST_BASE + "/cmd/" + id).set(data); return id; },
+    async result(id, ms) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < (ms || 4000)) { const s = await db.doc(TEST_BASE + "/res/" + id).get(); if (s.exists) return s.data(); await new Promise((r) => setTimeout(r, 15)); }
+      throw new Error("No result for " + id + " within " + (ms || 4000) + "ms");
+    },
+    async run(steps, extra, ms) { const id = await env.send(steps, extra); const res = await env.result(id, ms); const cmd = (await db.doc(TEST_BASE + "/cmd/" + id).get()).data(); return { id, res, cmd }; },
+    async cmdStatus(id) { return (await db.doc(TEST_BASE + "/cmd/" + id).get()).data().status; },
+    dispose() { bridges.forEach((b) => b.stop()); host.remove(); },
+  };
+  return env;
+}
+
+const tsleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ctlOf = (res, id) => res.results.find((r) => r.action === "read" || r.action === "inspect").controls.find((c) => c.id === id);
+
+const TESTS = [
+  { id: "ping", name: "The page answers a ping", why: "Before real work, Claude can check the page is alive and whether it is visible. A hidden tab runs slowly.",
+    fn: async (t) => {
+      const e = await t.env(); const r = await e.run([{ action: "ping" }]);
+      t.eq(r.res.status, "done"); t.ok(r.res.results[0].pong, "pong"); t.ok(typeof r.res.results[0].visibility === "string", "visibility reported");
+    } },
+  { id: "hello", name: "The page announces itself when it opens", why: "A hello document tells Claude the page opened, which bridge version it runs, and who holds the channel.",
+    fn: async (t) => {
+      const e = await t.env(); const hello = e.db.dump()[TEST_BASE + "/meta/hello"];
+      t.ok(hello && hello.version === "2.2", "hello document written"); t.ok(e.states.some((s) => s[0] === "on"), "state is on");
+    } },
+  { id: "read-drafts", name: "read sees text that was typed but not submitted", why: "PITFALL: innerText ignores what is typed inside fields. read returns every field's value, so drafts are not invisible.",
+    fn: async (t) => {
+      const e = await t.env();
+      const r = await e.run([{ action: "fill", selector: "#item", value: "draft task" }, { action: "fill", selector: "#note", value: "line one\nline two" }, { action: "read" }, { action: "text", selector: "#form" }]);
+      t.eq(r.res.status, "done");
+      t.eq(ctlOf(r.res, "item").value, "draft task"); t.eq(ctlOf(r.res, "note").value, "line one\nline two");
+      const txt = r.res.results[3];
+      t.ok(txt.text.indexOf("draft task") < 0, "text does not contain the typed value (that is the pitfall)");
+      t.ok(/typed values/.test(txt.note || ""), "text warns that typed values were left out");
+    } },
+  { id: "read-lists", name: "read lists the items already on the page", why: "The first version of inspect only listed buttons. read also returns lists and tables, so existing content is visible.",
+    fn: async (t) => {
+      const e = await t.env();
+      const r = await e.run([{ action: "call", name: "addTask", args: { text: "Alpha", note: "first" } }, { action: "call", name: "addTask", args: { text: "Beta", urgent: true } }, { action: "read" }]);
+      const lists = r.res.results[2].lists; t.eq(lists.length, 1); t.eq(lists[0].items.length, 2);
+      t.ok(lists[0].items[0].indexOf("Alpha") === 0 && lists[0].items[1].indexOf("urgent") > 0, "items carry their details");
+    } },
+  { id: "read-hidden", name: "read leaves out hidden content", why: "Hidden text is not what the user sees. read and text follow visibility, and say so.",
+    fn: async (t) => {
+      const e = await t.env();
+      const r = await e.run([{ action: "read" }, { action: "text", selector: "#details" }, { action: "click", selector: "#toggle" }, { action: "text", selector: "#details" }]);
+      t.ok(r.res.results[0].text.indexOf("kept in memory") < 0, "hidden panel not in read");
+      t.eq(r.res.results[1].visible, false); t.ok(/hidden/.test(r.res.results[1].note || ""), "hidden note");
+      t.ok(r.res.results[3].text.indexOf("kept in memory") >= 0, "visible after toggle");
+    } },
+  { id: "inspect-hints", name: "inspect gives usable selectors and states", why: "Claude should not guess selectors. inspect returns a selector, label, value, disabled and visible for every control.",
+    fn: async (t) => {
+      const e = await t.env(); const r = await e.run([{ action: "inspect" }]); const c = r.res.results[0].controls;
+      const clear = c.find((x) => x.id === "clear"); t.ok(clear && clear.disabled === true && clear.selector === "#clear", "disabled button reported");
+      t.eq(c.find((x) => x.id === "category").options.length, 3);
+      t.eq(c.find((x) => x.id === "urgent").checked, false);
+    } },
+  { id: "special-chars", name: "Quotes, HTML and emoji survive and are not run as HTML", why: "Typed text must arrive exactly and must never be interpreted as markup.",
+    fn: async (t) => {
+      const e = await t.env(); const nasty = 'He said "hi" & <b>bold</b> <img src=x onerror=alert(1)> 😀 \'q\'';
+      const r = await e.run([{ action: "fill", selector: "#item", value: nasty }, { action: "click", selector: "#add" }, { action: "read" }]);
+      t.eq(r.res.status, "done"); t.eq(r.res.results[0].accepted, true);
+      t.ok(r.res.results[2].lists[0].items[0].indexOf(nasty) === 0, "text is intact");
+      t.eq(e.root.querySelectorAll("#list b, #list img").length, 0);
+    } },
+  { id: "long-value", name: "A very long value is accepted but reported shortened", why: "Results have size caps. The value is read back with its true length so nothing is silently lost.",
+    fn: async (t) => {
+      const e = await t.env(); const r = await e.run([{ action: "fill", selector: "#note", value: "x".repeat(5000) }, { action: "read" }]);
+      t.eq(r.res.results[0].accepted, true); t.eq(r.res.results[0].valueLength, 5000);
+      const c = ctlOf(r.res, "note"); t.eq(c.value.length, 2000); t.eq(c.valueLength, 5000);
+    } },
+  { id: "disabled-click", name: "Clicking a disabled button fails loudly", why: "PITFALL: a click on a disabled button does nothing. The bridge refuses and says why, instead of reporting success.",
+    fn: async (t) => {
+      const e = await t.env(); const r = await e.run([{ action: "click", selector: "#clear" }]);
+      t.eq(r.res.status, "error"); t.ok(/disabled/.test(r.res.error), "error mentions disabled");
+    } },
+  { id: "hidden-click", name: "Clicking a hidden element is refused unless forced", why: "A person cannot click what they cannot see. force:true is the explicit override.",
+    fn: async (t) => {
+      const e = await t.env();
+      const a = await e.run([{ action: "click", selector: "#synced" }]); t.eq(a.res.status, "error"); t.ok(/not visible/.test(a.res.error));
+      const b = await e.run([{ action: "click", selector: "#synced", force: true }]); t.eq(b.res.status, "done");
+    } },
+  { id: "no-match", name: "A selector that matches nothing is an error", why: "The message names the selector so the fix is obvious.",
+    fn: async (t) => { const e = await t.env(); const r = await e.run([{ action: "click", selector: "#nope" }]); t.eq(r.res.status, "error"); t.ok(/No element matches #nope/.test(r.res.error)); } },
+  { id: "bad-selector", name: "A malformed selector does not crash the bridge", why: "querySelector throws on bad syntax. That must become a normal error, and the next command must still work.",
+    fn: async (t) => {
+      const e = await t.env(); const a = await e.run([{ action: "click", selector: "##" }]); t.eq(a.res.status, "error"); t.ok(/Invalid selector/.test(a.res.error));
+      const b = await e.run([{ action: "ping" }]); t.eq(b.res.status, "done");
+    } },
+  { id: "many-matches", name: "Several matches: warn, and let the command choose with index", why: "PITFALL: '.remove' matches every Remove button. The bridge reports the count and takes the first, or the one you ask for.",
+    fn: async (t) => {
+      const e = await t.env();
+      const a = await e.run([{ action: "call", name: "addTask", args: { text: "A" } }, { action: "call", name: "addTask", args: { text: "B" } }, { action: "click", selector: ".remove" }]);
+      t.eq(a.res.results[2].matches, 2); t.ok(/matched 2/.test(a.res.results[2].warning), "warning"); t.eq(e.tasks.length, 1); t.eq(e.tasks[0].text, "B");
+      const b = await e.run([{ action: "click", selector: ".remove", index: 3 }]); t.eq(b.res.status, "error"); t.ok(/out of range/.test(b.res.error));
+      const c = await e.run([{ action: "call", name: "addTask", args: { text: "C" } }, { action: "click", selector: ".remove", index: 1 }]); t.eq(c.res.status, "done"); t.eq(e.tasks.map((x) => x.text).join(","), "B");
+    } },
+  { id: "wait-timeout", name: "wait_for that times out fails the command", why: "PITFALL: carrying on after a missed wait runs the next steps on the wrong screen. The command stops with a clear message.",
+    fn: async (t) => { const e = await t.env(); const r = await e.run([{ action: "wait_for", selector: "#synced", timeoutMs: 250 }, { action: "call", name: "addTask", args: { text: "should not run" } }]); t.eq(r.res.status, "error"); t.ok(/Timed out/.test(r.res.error)); t.eq(e.tasks.length, 0); } },
+  { id: "optional-step", name: "An optional step may fail without stopping the command", why: "For exploratory steps. The failure is still recorded in the results.",
+    fn: async (t) => { const e = await t.env(); const r = await e.run([{ action: "wait_for", selector: "#synced", timeoutMs: 200, optional: true }, { action: "call", name: "addTask", args: { text: "ran" } }]); t.eq(r.res.status, "done"); t.eq(r.res.results[0].ok, false); t.eq(e.tasks.length, 1); } },
+  { id: "wait-gone", name: "wait_for can wait for something to disappear", why: "Spinners and 'Loading...' labels are best handled by waiting until they are gone.",
+    fn: async (t) => {
+      const e = await t.env();
+      const r = await e.run([{ action: "click", selector: "#sync" }, { action: "wait_for", selector: "#syncing" }, { action: "wait_for", selector: "#syncing", gone: true, timeoutMs: 3000 }, { action: "wait_for", selector: "#synced", textIncludes: "Synced" }]);
+      t.eq(r.res.status, "done");
+    } },
+  { id: "unknown-atomic", name: "A command with an unknown action runs nothing at all", why: "Validate the whole command first. Otherwise the first steps run and the rest are rejected, leaving the app half changed.",
+    fn: async (t) => {
+      const e = await t.env(); const r = await e.run([{ action: "fill", selector: "#item", value: "x" }, { action: "explode" }]);
+      t.eq(r.res.status, "invalid"); t.ok(/unknown action "explode"/.test(r.res.error)); t.eq(e.q("#item").value, "");
+    } },
+  { id: "bad-shapes", name: "Malformed commands are rejected, never hang", why: "Anything can end up in the db: wrong types, empty lists, too many steps. Each gets a clear 'invalid' result.",
+    fn: async (t) => {
+      const e = await t.env();
+      const cases = [{ steps: "nope" }, { steps: [] }, { steps: Array.from({ length: 41 }, () => ({ action: "ping" })) }, { steps: [1] }, { steps: [{}] }, { steps: [{ action: "ping" }], expires: "soon" }, { hello: "no steps" }];
+      for (const c of cases) { const id = await e.sendRaw(Object.assign({ status: "pending" }, c)); const r = await e.result(id); t.eq(r.status, "invalid", JSON.stringify(c).slice(0, 40)); t.ok(r.error, "has a message"); }
+    } },
+  { id: "expired", name: "A stale command is skipped; a fresh one runs", why: "A pending command waits until the page opens. expires stops old instructions running at a surprising moment.",
+    fn: async (t) => {
+      const e = await t.env();
+      const a = await e.run([{ action: "call", name: "addTask", args: { text: "late" } }], { expires: Date.now() - 1000 }); t.eq(a.res.status, "expired"); t.eq(e.tasks.length, 0);
+      const b = await e.run([{ action: "call", name: "addTask", args: { text: "on time" } }], { expires: Date.now() + 60000 }); t.eq(b.res.status, "done"); t.eq(e.tasks.length, 1);
+    } },
+  { id: "dropdown-check-press", name: "select, check and press work, and misuse is explained", why: "Dropdowns, checkboxes and key presses have their own steps. Using fill on a dropdown gets a helpful error.",
+    fn: async (t) => {
+      const e = await t.env();
+      const a = await e.run([{ action: "select", selector: "#category", label: "Work" }, { action: "check", selector: "#urgent" }, { action: "fill", selector: "#item", value: "boss task" }, { action: "press", selector: "#item", key: "Enter" }]);
+      t.eq(a.res.status, "done"); t.eq(e.tasks[0].category, "Work"); t.eq(e.tasks[0].urgent, true);
+      const b = await e.run([{ action: "select", selector: "#category", label: "Nope" }]); t.ok(/Options: "Home", "Work", "Errands"/.test(b.res.error), "lists the options");
+      const c = await e.run([{ action: "check", selector: "#item" }]); t.eq(c.res.status, "error");
+      const d = await e.run([{ action: "fill", selector: "#category", value: "Work" }]); t.ok(/Use "select"/.test(d.res.error));
+    } },
+  { id: "disabled-fill", name: "fill refuses disabled and read-only fields", why: "Typing into a locked field changes nothing a person could do. The bridge says so.",
+    fn: async (t) => {
+      const e = await t.env(); e.q("#item").disabled = true;
+      const a = await e.run([{ action: "fill", selector: "#item", value: "x" }]); t.ok(/disabled/.test(a.res.error));
+      e.q("#item").disabled = false; e.q("#item").readOnly = true;
+      const b = await e.run([{ action: "fill", selector: "#item", value: "x" }]); t.ok(/read-only/.test(b.res.error));
+    } },
+  { id: "fill-readback", name: "fill reads the value back and flags changes", why: "PITFALL: a number field rejects letters; maxlength truncates. accepted:false tells Claude the app did not take the value as typed.",
+    fn: async (t) => {
+      const e = await t.env(); const n = document.createElement("input"); n.id = "qty"; n.type = "number"; e.root.querySelector("#form").appendChild(n);
+      const r = await e.run([{ action: "fill", selector: "#qty", value: "abc" }]);
+      t.eq(r.res.status, "done"); t.eq(r.res.results[0].accepted, false); t.ok(/changed the value/.test(r.res.results[0].warning || ""));
+    } },
+  { id: "text-on-field", name: "text on an input returns its value", why: "Asking for the 'text' of a field is a natural mistake. It answers with the value and says that is what it did.",
+    fn: async (t) => { const e = await t.env(); const r = await e.run([{ action: "fill", selector: "#item", value: "abc" }, { action: "text", selector: "#item" }]); t.eq(r.res.results[1].text, "abc"); t.eq(r.res.results[1].source, "value"); } },
+  { id: "call-errors", name: "Named actions: unknown, throwing, huge and circular results", why: "Your own functions can fail in ways the bridge cannot predict. Each failure becomes a clear error, not a crash.",
+    opts: { actions: { boom: async () => { throw new Error("kaput"); }, big: async () => "x".repeat(30000), circ: async () => { const a = {}; a.self = a; return a; } } },
+    fn: async (t) => {
+      const e = await t.env(t.opts);
+      let r = await e.run([{ action: "call", name: "nope" }]); t.ok(/No registered action: nope. Registered: addTask, getState, boom/.test(r.res.error), "lists registered");
+      r = await e.run([{ action: "call", name: "boom" }]); t.ok(/kaput/.test(r.res.error));
+      r = await e.run([{ action: "call", name: "big" }]); t.ok(/too large/.test(r.res.error));
+      r = await e.run([{ action: "call", name: "circ" }]); t.ok(/not JSON-serializable/.test(r.res.error));
+      r = await e.run([{ action: "call", name: "getState", args: [1] }]); t.ok(/"args" must be an object/.test(r.res.error));
+    } },
+  { id: "screenshots", name: "Screenshots: success, soft failures and pruning", why: "A missing picture should not sink the command. Failures are reported and the command continues. Old pictures are deleted.",
+    fn: async (t) => {
+      const ok = "data:image/jpeg;base64,AAAA";
+      let e = await t.env({ snapshot: async () => ok, limits: { maxSnaps: 3 } });
+      let r = await e.run([{ action: "screenshot" }, { action: "screenshot" }, { action: "screenshot" }, { action: "screenshot" }, { action: "screenshot" }]);
+      t.eq(r.res.status, "done"); t.eq(Object.keys(e.db.dump()).filter((p) => p.indexOf(TEST_BASE + "/snap/") === 0).length, 3, "only 3 kept");
+      for (const [name, snap] of [["null", async () => null], ["throws", async () => { throw new Error("canvas tainted"); }], ["huge", async () => "data:image/jpeg;base64," + "A".repeat(200000)]]) {
+        e = await t.env({ snapshot: snap }); r = await e.run([{ action: "screenshot" }, { action: "call", name: "addTask", args: { text: "after" } }]);
+        t.eq(r.res.status, "done", name); t.eq(r.res.results[0].ok, false, name); t.ok(r.res.results[0].reason, name + " reason"); t.eq(e.tasks.length, 1, name + " continued");
+      }
+      e = await t.env(); r = await e.run([{ action: "screenshot" }]); t.eq(r.res.results[0].ok, false); t.ok(/not available/.test(r.res.results[0].reason));
+    } },
+  { id: "rapid-fire", name: "Twelve commands sent at once all run, in order", why: "Claude may queue several commands. They must all finish and keep their order.",
+    fn: async (t) => {
+      const e = await t.env(); const ids = [];
+      for (let i = 1; i <= 12; i++) ids.push(await e.send([{ action: "call", name: "addTask", args: { text: "T" + i } }]));
+      for (const id of ids) t.eq((await e.result(id, 6000)).status, "done", id);
+      t.eq(e.tasks.map((x) => x.text).join(","), Array.from({ length: 12 }, (_, i) => "T" + (i + 1)).join(","));
+    } },
+  { id: "two-tabs", name: "Two tabs on the same channel never run a command twice", why: "PITFALL: the same page open twice (or after a reconnect) would run every command twice. A lease lets only one tab take each command.",
+    fn: async (t) => {
+      const e = await t.env({ delayMs: 4 }); const b2 = e.addBridge("tab-B"); await b2.start();
+      const ids = []; for (let i = 0; i < 6; i++) ids.push(await e.send([{ action: "call", name: "addTask", args: { text: "N" + i } }]));
+      for (const id of ids) await e.result(id, 6000);
+      await tsleep(150); t.eq(e.tasks.length, 6, "each command ran exactly once");
+    } },
+  { id: "interrupted", name: "A command left 'running' by a closed page is marked interrupted, not re-run", why: "PITFALL: if the page closes mid-command we cannot know which steps happened. It is flagged, never retried. A command that another tab is really running is left alone.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { leaseMs: 1000 } });
+      await e.db.doc(TEST_BASE + "/cmd/c900").set({ status: "running", steps: [{ action: "call", name: "addTask", args: { text: "ghost" } }] });
+      await e.db.doc(TEST_BASE + "/cmd/c901").set({ status: "running", steps: [{ action: "ping" }] });
+      await e.db.doc(TEST_BASE + "/cmd/c901").acquire({ holder: "other-tab", ttlMs: 60000 });
+      await e.bridge.start();
+      const r = await e.result("c900", 3000); t.eq(r.status, "interrupted"); t.eq(await e.cmdStatus("c900"), "interrupted"); t.eq(e.tasks.length, 0, "ghost command was not re-run");
+      await tsleep(200); t.eq(await e.cmdStatus("c901"), "running", "live command left alone");
+    }, noStart: true },
+  { id: "pending-on-open", name: "Commands written while the page was closed run, in order, when it opens", why: "Claude can leave commands for a page that is not open yet. They wait in the db and run, oldest first, as soon as the page starts.",
+    fn: async (t) => {
+      const e = await t.env({ noStart: true });
+      for (const n of ["first", "second", "third"]) await e.send([{ action: "call", name: "addTask", args: { text: n } }]);
+      t.eq(e.tasks.length, 0, "nothing runs while the page is closed");
+      await e.bridge.start();
+      for (const id of ["c001", "c002", "c003"]) t.eq((await e.result(id, 3000)).status, "done", id);
+      t.eq(e.tasks.map((x) => x.text).join(","), "first,second,third");
+    }, noStart: true },
+  { id: "pause", name: "Pause holds commands until resumed", why: "The person stays in control. Nothing runs while the Pause box is ticked.",
+    fn: async (t) => {
+      const e = await t.env(); e.bridge.pause(true);
+      const id = await e.send([{ action: "call", name: "addTask", args: { text: "held" } }]); await tsleep(400);
+      t.eq(e.tasks.length, 0, "nothing ran while paused"); t.eq(await e.cmdStatus(id), "pending");
+      e.bridge.pause(false); t.eq((await e.result(id, 3000)).status, "done"); t.eq(e.tasks.length, 1);
+    } },
+  { id: "stop", name: "A stopped bridge ignores new commands", why: "Stopping must be clean: no late surprises after the page decides it is done.",
+    fn: async (t) => { const e = await t.env(); e.bridge.stop(); const id = await e.send([{ action: "ping" }]); await tsleep(400); t.eq(await e.cmdStatus(id), "pending"); } },
+  { id: "result-too-big", name: "An oversized result is dropped with an explanation", why: "A document is limited to 256 KiB. The command still ends cleanly and tells Claude to ask for less.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { maxResultBytes: 3000 } });
+      const steps = []; for (let i = 0; i < 6; i++) steps.push({ action: "call", name: "addTask", args: { text: "x".repeat(400) } }); steps.push({ action: "read" });
+      const r = await e.run(steps); t.eq(r.res.status, "error"); t.ok(/too large/.test(r.res.error)); t.ok(!("lists" in r.res.results[6]), "big fields dropped");
+    } },
+  { id: "step-timeout", name: "A step that never finishes times out", why: "One stuck action must not freeze every later command.",
+    opts: { actions: { hang: () => new Promise(() => {}) }, limits: { stepTimeoutMs: 300 } },
+    fn: async (t) => {
+      const e = await t.env(t.opts); const a = await e.run([{ action: "call", name: "hang" }]); t.eq(a.res.status, "error"); t.ok(/timed out/.test(a.res.error));
+      const b = await e.run([{ action: "ping" }]); t.eq(b.res.status, "done", "later commands still run");
+    } },
+  { id: "db-hiccup", name: "A db failure while claiming a command is retried later", why: "PITFALL: if the first attempt fails and the page forgets the command, it sits pending forever. A re-scan picks it up when the db recovers.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { rescanMs: 300 } });
+      const id = await e.send([{ action: "call", name: "addTask", args: { text: "retried" } }]);
+      e.db.faults.writeError = Object.assign(new Error("quota"), { code: "quota_exceeded" });
+      await tsleep(120); e.db.faults.writeError = null;
+      t.eq((await e.result(id, 4000)).status, "done"); t.eq(e.tasks.length, 1);
+    } },
+  { id: "view-only", name: "A view-only user is told the channel is off", why: "Viewers cannot write to their own subtree. The page says so instead of failing silently.",
+    fn: async (t) => {
+      const e = await t.env({ noStart: true }); e.db.faults.writeError = Object.assign(new Error("denied"), { code: "invalid_argument" });
+      const ok = await e.bridge.start(); t.eq(ok, false); t.ok(e.states.some((s) => s[0] === "off" && /view-only/.test(s[1])), "state is off with a reason");
+    }, noStart: true },
+  { id: "path-rules", name: "The fake db enforces path parity like the real one", why: "The most common db mistake: wrong number of path segments. Documents need an even count, collections an odd count.",
+    fn: async (t) => {
+      const db = createFakeDb(); let threw = 0;
+      try { db.doc("a/b/c"); } catch (_) { threw++; } try { db.collection("a/b"); } catch (_) { threw++; }
+      t.eq(threw, 2); t.ok(db.doc("data/users/u1/rc"), "rc is a document (4 segments)"); t.ok(db.collection("data/users/u1/rc/cmd"), "cmd is a collection (5 segments)");
+    } },
+  { id: "busy-other-agent", name: "A second agent is told the app is busy and nothing runs", why: "PITFALL: two agents driving one app at once interleave clicks and typing. The first agent to run owns the app. Others get status busy, with who holds it and when it frees, and none of their steps run.",
+    fn: async (t) => {
+      const e = await t.env();
+      const a = await e.run([{ action: "fill", selector: "#item", value: "from A" }], { agent: "agent-A" }); t.eq(a.res.status, "done");
+      const b = await e.run([{ action: "fill", selector: "#item", value: "from B" }, { action: "click", selector: "#add" }], { agent: "agent-B" });
+      t.eq(b.res.status, "busy"); t.ok(/agent-A/.test(b.res.error), "names who holds it"); t.ok(b.res.lock && b.res.lock.held && b.res.lock.agent === "agent-A", "result carries the lock info");
+      t.eq(e.q("#item").value, "from A", "agent B changed nothing"); t.eq(e.tasks.length, 0, "agent B added nothing");
+      const a2 = await e.run([{ action: "read" }], { agent: "agent-A" }); t.eq(a2.res.status, "done", "the holder carries on");
+    } },
+  { id: "busy-ping-and-info", name: "ping never takes the app and reports who holds it", why: "Agents need a safe way to look before they act. A ping-only command always runs, never takes the lock, and says who is using the app.",
+    fn: async (t) => {
+      const e = await t.env();
+      const p0 = await e.run([{ action: "ping" }], { agent: "agent-B" }); t.eq(p0.res.results[0].lock.held, false, "free at first");
+      await e.run([{ action: "read" }], { agent: "agent-A" });
+      const p1 = await e.run([{ action: "ping" }], { agent: "agent-B" });
+      t.eq(p1.res.status, "done"); t.eq(p1.res.results[0].lock.agent, "agent-A"); t.eq(p1.res.results[0].lock.state, "idle");
+      const again = await e.run([{ action: "read" }], { agent: "agent-A" }); t.eq(again.res.status, "done", "ping did not steal the app");
+    } },
+  { id: "busy-idle-release", name: "The app frees itself after inactivity", why: "A crashed or forgetful agent must not block the app forever. The lock expires after lockIdleMs without activity, and then anyone may use the app.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { lockIdleMs: 350 } });
+      await e.run([{ action: "read" }], { agent: "agent-A" });
+      const early = await e.run([{ action: "read" }], { agent: "agent-B" }); t.eq(early.res.status, "busy", "busy while A is recent");
+      await tsleep(450);
+      const late = await e.run([{ action: "read" }], { agent: "agent-B" }); t.eq(late.res.status, "done", "free after the idle time");
+      const pa = await e.run([{ action: "read" }], { agent: "agent-A" }); t.eq(pa.res.status, "busy", "now B holds it");
+    } },
+  { id: "busy-release-takeover", name: "release frees the app at once, takeover forces it", why: "A polite agent sends release:true when done. takeover:true exists for when the person says to cut in, and is logged.",
+    fn: async (t) => {
+      const e = await t.env();
+      await e.run([{ action: "read" }], { agent: "agent-A", release: true });
+      const b = await e.run([{ action: "read" }], { agent: "agent-B" }); t.eq(b.res.status, "done", "free right after release");
+      const a = await e.run([{ action: "read" }], { agent: "agent-A" }); t.eq(a.res.status, "busy");
+      const a2 = await e.run([{ action: "read" }], { agent: "agent-A", takeover: true }); t.eq(a2.res.status, "done", "takeover works");
+      t.ok(e.logs.some((l) => /took the app over/.test(l)), "takeover is logged");
+      const bad = await e.sendRaw({ status: "pending", steps: [{ action: "read" }], agent: 5, takeover: "yes" }); t.eq((await e.result(bad)).status, "invalid", "bad lock fields are rejected");
+    } },
+  { id: "busy-long-command", name: "A long command keeps its lock while it runs", why: "The idle clock starts when a command ENDS. A command that runs longer than lockIdleMs must not lose the app halfway.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { lockIdleMs: 300, leaseMs: 600 } });
+      const long = await e.send([{ action: "wait", ms: 900 }, { action: "fill", selector: "#item", value: "long" }], { agent: "agent-A" });
+      await tsleep(500);
+      const b = await e.run([{ action: "fill", selector: "#item", value: "intruder" }], { agent: "agent-B" }); t.eq(b.res.status, "busy", "still held mid-command");
+      t.eq((await e.result(long)).status, "done"); t.eq(e.q("#item").value, "long");
+    } },
+  { id: "agent-required", name: "An app can require every command to name its agent", why: "With requireAgent on, a command with no agent name is invalid and nothing runs, so the busy message can always say who holds the app.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { requireAgent: true } });
+      const no = await e.run([{ action: "fill", selector: "#item", value: "x" }]); t.eq(no.res.status, "invalid"); t.ok(/session name/.test(no.res.error), "tells the agent what to do"); t.eq(e.q("#item").value, "", "nothing ran");
+      const blank = await e.run([{ action: "read" }], { agent: "   " }); t.eq(blank.res.status, "invalid", "a blank name does not count");
+      const yes = await e.run([{ action: "read" }], { agent: "Sales report helper" }); t.eq(yes.res.status, "done");
+    } },
+  { id: "session-identity", name: "The session id is the identity; a name can be shared or changed", why: "The plugin hook stamps each command with the real session id. Two sessions that use the same display name are still different owners, and one session that changes its name is still the same owner.",
+    fn: async (t) => {
+      const e = await t.env();
+      const a = await e.run([{ action: "read" }], { agent: "helper", session: "aaaa1111-0000" }); t.eq(a.res.status, "done");
+      const b = await e.run([{ action: "fill", selector: "#item", value: "x" }], { agent: "helper", session: "bbbb2222-0000" });
+      t.eq(b.res.status, "busy", "same name, different session: busy"); t.eq(e.q("#item").value, "", "nothing ran");
+      const a2 = await e.run([{ action: "read" }], { agent: "renamed", session: "aaaa1111-0000" }); t.eq(a2.res.status, "done", "same session, new name: still the owner");
+      const sub = await e.run([{ action: "read" }], { session: "aaaa1111-0000", subagent: { id: "sub-1", type: "Explore" } }); t.eq(sub.res.status, "busy", "a subagent of the same session is a different caller");
+      const lock = JSON.parse(JSON.stringify(e.db.dump()[TEST_BASE + "/meta/lock"])); t.ok(/aaaa1111/.test(lock.agent) && lock.verified === true, "the lock label carries the short session id");
+    } },
+  { id: "session-logs", name: "Log lines carry the session", why: "The activity log should say who did what. Every log line for a command starts with the session label.",
+    fn: async (t) => {
+      const e = await t.env();
+      await e.run([{ action: "read" }], { agent: "Sales helper", session: "cccc3333-0000" });
+      t.ok(e.logs.some((l) => /Sales helper · cccc3333.*started/.test(l)), "started line has the label");
+      t.ok(e.logs.some((l) => /Sales helper · cccc3333.*done/.test(l)), "done line has the label");
+    } },
+  { id: "session-satisfies-require", name: "A session id satisfies requireAgent", why: "With the plugin installed the agent need not write a name at all: the stamped session id is enough.",
+    fn: async (t) => {
+      const e = await t.env({ limits: { requireAgent: true } });
+      const r = await e.run([{ action: "read" }], { session: "dddd4444-0000" }); t.eq(r.res.status, "done");
+      const bad = await e.sendRaw({ status: "pending", steps: [{ action: "read" }], session: 7 }); t.eq((await e.result(bad)).status, "invalid", "a non-text session is rejected");
+    } },
+];
+
+async function runStressTests(onResult, only) {
+  const summary = { passed: 0, failed: 0, results: [] };
+  for (const test of TESTS) {
+    if (only && only.indexOf(test.id) < 0) continue;
+    const envs = [], t0 = Date.now();
+    const t = {
+      opts: test.opts,
+      async env(o) { const e = makeEnv(o || {}); envs.push(e); if (!(o && o.noStart) && !test.noStart) await e.bridge.start(); return e; },
+      eq(a, b, m) { if (a !== b) throw new Error((m ? m + ": " : "") + "expected " + JSON.stringify(b) + " but got " + JSON.stringify(a)); },
+      ok(v, m) { if (!v) throw new Error("check failed" + (m ? ": " + m : "")); },
+    };
+    let error = null;
+    try { await test.fn(t); } catch (e) { error = String((e && e.message) || e); }
+    envs.forEach((e) => e.dispose());
+    const r = { id: test.id, name: test.name, why: test.why, passed: !error, error, ms: Date.now() - t0 };
+    summary.results.push(r); r.passed ? summary.passed++ : summary.failed++;
+    if (onResult) onResult(r);
+  }
+  return summary;
+}
+</script>
+<script>const PITFALLS = [
+  { t: "text misses what was typed", sym: "You read a form with text and the user's draft is not there.", why: "innerText returns the words on screen. What a person types lives in the field's value, which innerText never includes.", fix: "Use read (or inspect). They return every field's value. text now warns when fields inside have typed values, and on a field itself it returns the value.", tests: ["read-drafts", "text-on-field"] },
+  { t: "inspect did not list what was already on the page", sym: "inspect showed buttons and inputs but not the existing list items.", why: "inspect describes controls only. Lists and tables are content.", fix: "read returns lists and tables (visible items only) along with the controls, and inspect gives selectors, labels, values, disabled and visible for each control.", tests: ["read-lists", "inspect-hints"] },
+  { t: "Hidden content", sym: "Text that a person cannot see appears in results, or the opposite.", why: "Hidden elements are not what the user sees.", fix: "read and text follow visibility. text says when an element is hidden.", tests: ["read-hidden"] },
+  { t: "Waiting on the wrong thing", sym: "The screenshot shows \"Running...\", or later steps run on the wrong screen.", why: "A wait that matched something shown at the start returned too early. A wait that timed out quietly let the command carry on.", fix: "Wait for something that appears only at the end. A timeout fails the command with a clear message. Use \"optional\": true only for exploratory steps. gone:true waits for spinners to vanish.", tests: ["wait-timeout", "optional-step", "wait-gone"] },
+  { t: "Silent do-nothing clicks", sym: "The step says ok but nothing changed.", why: "Clicking a disabled button, or an element a person cannot see, does nothing.", fix: "click, fill, select and check refuse disabled, read-only and hidden elements and say why. force:true is the explicit override for hidden ones.", tests: ["disabled-click", "hidden-click", "disabled-fill"] },
+  { t: "Selectors that match too much or nothing", sym: "The wrong button got clicked, or nothing did.", why: ".remove matches every Remove button. A typo matches nothing. A malformed selector throws.", fix: "Every result reports matches and warns when there are several. index picks one. Errors name the selector. A malformed selector becomes a normal error.", tests: ["many-matches", "no-match", "bad-selector"] },
+  { t: "The field did not take the value", sym: "You filled a number field with letters, or a field with a length limit.", why: "The browser quietly changes the value.", fix: "fill reads the value back and returns accepted:true or false with the real value. Long values are reported with their true length. Quotes, HTML and emoji arrive exactly and are never run as markup.", tests: ["fill-readback", "long-value", "special-chars"] },
+  { t: "Frameworks that ignore .value = ...", sym: "The field looks filled but the app's own state is empty (React and similar).", why: "These libraries track the value themselves and only notice real input events with the browser's own setter.", fix: "The bridge sets the value with the browser's native setter, then fires input and change events. (No automatic test: it needs a framework page. Test it on your own app.)", tests: [] },
+  { t: "Half-run commands", sym: "A typo in the last step means the first steps already ran.", why: "Checking steps one at a time as they run leaves the app half changed.", fix: "The bridge validates the whole command first. One bad step makes it invalid and nothing runs. Empty lists, too many steps, wrong types and bad expires are all caught.", tests: ["unknown-atomic", "bad-shapes"] },
+  { t: "The same command running twice", sym: "Every action happens twice, or a retry duplicates work.", why: "Two tabs of the same page, or a reconnect, both see the command.", fix: "Each tab first takes a lease on the command. Only one gets it. If the database fails while claiming, the page remembers to look again soon so the command is not forgotten.", tests: ["two-tabs", "db-hiccup"] },
+  { t: "The page closed mid-command", sym: "A command is stuck at \"running\" forever.", why: "We cannot know which steps already happened.", fix: "On the next start, a command left running with no live lease is marked interrupted with an explanation. It is never retried. Read the page state before deciding what to do.", tests: ["interrupted"] },
+  { t: "Commands arriving at the wrong moment", sym: "An old instruction runs when the page opens hours later.", why: "Pending commands wait until a page opens, then run.", fix: "Add expires. Commands written while the page was closed run oldest first, as designed.", tests: ["expired", "pending-on-open"] },
+  { t: "One stuck step blocks everything", sym: "Nothing runs after a certain command.", why: "A named action (or a wait) never finishes.", fix: "Every step has a timeout. The command ends with an error and the next one runs.", tests: ["step-timeout"] },
+  { t: "Oversized results", sym: "The result never appears, or the database refuses it.", why: "A document is limited to 256 KB.", fix: "Text is capped. Results over the limit are replaced by a short explanation telling Claude to ask for less. Named actions that return too much, or something that cannot be saved as JSON, fail with a clear error.", tests: ["result-too-big", "call-errors"] },
+  { t: "Screenshots fail or mislead", sym: "No picture, or the picture differs slightly from the screen.", why: "html2canvas redraws the page. It can fail, it can be too large, and it renders some things differently. In a real test a two-line note appeared on one line in the picture, while read returned it exactly.", fix: "A screenshot problem is a soft failure: ok:false with a reason, and the command continues. Old pictures are deleted. Use read for exact values and screenshots for layout. A selector captures a smaller area.", tests: ["screenshots"] },
+  { t: "Synthetic input has limits", sym: "press Enter did not submit a form.", why: "Synthetic key events reach the page's handlers but do not trigger browser defaults. Hover, drag and drawing are not covered.", fix: "Click the submit button. Use a call action, or write data directly, for anything pointer-based.", tests: ["dropdown-check-press"] },
+  { t: "Is anybody there?", sym: "You do not know whether the page is open, or whether it is hidden.", why: "A closed page cannot answer, and a hidden tab is throttled.", fix: "ping returns the bridge version and the page's visibility. The page also writes meta/hello when it opens. If nobody answers, Claude can show the artifact pane and open the app, but in a real test that took over a minute and needed a second try, so be ready to open it yourself.", tests: ["ping", "hello"] },
+  { t: "View-only people", sym: "The panel says off for some users.", why: "Viewers cannot write, so they cannot have a channel.", fix: "The panel says why. They can still use the app normally. Give Contributor access for remote control.", tests: ["view-only"] },
+  { t: "Wrong path piece count", sym: "A database call throws about segments.", why: "Documents need an even number of path pieces and collections an odd number.", fix: "Remember data/users/<id>/rc is a document, and .../rc/cmd is a collection. The practice database throws the same error, so you learn it here.", tests: ["path-rules"] },
+  { t: "Data piles up", sym: "Writes start failing after a lot of use.", why: "An app holds at most 25,000 documents in total, shared by everyone.", fix: "The page deletes its own old screenshots. Ask Claude to delete old cmd and res documents, or add a cleanup routine.", tests: [] },
+  { t: "Keep it private", sym: "One person can read another's results.", why: "Shared paths are readable by everyone who can open the app.", fix: "Keep the channel under data/users/<id>/. That area is private even from the owner, which was confirmed on the real database.", tests: [] },
+  { t: "Actions you call should be safe to repeat", sym: "A retry charges, sends or deletes twice.", why: "Claude may send a command again after an error or an interruption.", fix: "Make named actions idempotent, for example by carrying an id and ignoring a repeat. The bridge itself never retries.", tests: [] },
+  { t: "Timers that write", sym: "The database slows down and costs grow.", why: "Writing from timers clutters the database.", fix: "The only timer write is the lease renewal while a command is running. There is no heartbeat. Use ping when you need to know the page is alive.", tests: [] },
+  { t: "Two agents on one app", sym: "Clicks and typing from two agents interleave, and each one reads a page the other changed.", why: "The same person, the same app, but two Claude sessions can write commands at once. Without a rule, both run.", fix: "Every command carries agent:\"name\". The first agent to run owns the app: others get status busy (nothing runs) with who holds it and when it frees. The idle clock starts when the owner's command ends, default 2 minutes. release:true frees it at once. Use ping first: it never takes the app and reports who holds it.", tests: ["busy-other-agent", "busy-ping-and-info", "busy-idle-release", "busy-release-takeover", "busy-long-command"] }
+];
+</script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} } };
+{ const t = store.get("rc2-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; }
+$("theme").addEventListener("click", () => {
+  const r = document.documentElement, dark = getComputedStyle(r).colorScheme.includes("dark") || r.dataset.theme === "dark";
+  r.dataset.theme = (r.dataset.theme === "dark" || (dark && r.dataset.theme !== "light")) ? "light" : "dark"; store.set("rc2-theme", r.dataset.theme);
+});
+$("count-tests").textContent = TESTS.length;
+
+const RULES = [
+  ["Look before you act", "Send read first. It returns the controls, their selectors and what is typed in them. Never guess a selector."],
+  ["Wait for the finish, not the start", "Wait on something that appears only when the work is done. A missed wait should fail the command, not shrug."],
+  ["Fail loudly", "A step that cannot do what was asked reports why. A silent success that changed nothing is the worst result."],
+  ["Check before you run", "Validate the whole command first. Half-run commands leave an app in a state nobody chose."],
+  ["Never retry blindly", "The bridge never re-runs a command. Read the page, then decide. Make your own named actions safe to repeat."],
+  ["Keep it private", "Use the private per-person channel. Nothing that matters belongs in a path other people can read."],
+  ["Exact data from text, layout from pictures", "Screenshots are redrawn from the page and can differ. Use read or text for values you will rely on."],
+  ["The person stays in charge", "Show what ran, offer Pause, never click the connector's Allow for them, and stop when the page closes."],
+];
+RULES.forEach((r, i) => { const d = document.createElement("div"); d.className = "card"; d.innerHTML = '<h3><span class="n">' + (i + 1) + "</span>" + esc(r[0]) + "</h3><p>" + esc(r[1]) + "</p>"; $("rules-grid").appendChild(d); });
+
+const PAIRS = [
+  { no: "Use text to see what a form contains", noCode: '{ "action": "text", "selector": "#form" }', yes: "Use read, which includes typed values", yesCode: '{ "action": "read", "selector": "#form" }', why: "innerText returns words on screen. What a person types lives in the field's value." },
+  { no: "Pause for a fixed time and hope", noCode: '{ "action": "wait", "ms": 5000 }', yes: "Wait for the end signal", yesCode: '{ "action": "wait_for", "selector": "#results", "timeoutMs": 30000 }', why: "A fixed pause is too short on a bad day and wasteful on a good one." },
+  { no: "Wait on a container that appears at the start", noCode: '{ "action": "wait_for", "selector": "#out-panel" }', yes: "Wait on the finished result", yesCode: '{ "action": "wait_for", "selector": "#results-table" }', why: "The first version waited on the frame and took a screenshot of 'Running...'." },
+  { no: "Send one 40-step command and hope", noCode: '40 steps, no reads in between', yes: "Small commands that end with a read", yesCode: 'fill, click, wait_for, read', why: "A small command fails in one clear place and leaves less to undo." },
+  { no: "Reuse a command id", noCode: '"doc_id": "c001"  (again)', yes: "A new, sortable id each time", yesCode: '"doc_id": "c002"', why: "Existing ids cannot be overwritten without pinning their version, and ids are processed in order." },
+  { no: "Retry as soon as something fails", noCode: 'same command, again', yes: "Read the page, then decide", yesCode: '{ "action": "read" }', why: "A failed or interrupted command may have partly run. Repeating it can double the effect." },
+  { no: "Use force:true as a habit", noCode: '{ "action": "click", "selector": "#x", "force": true }', yes: "Fix why it is hidden, or force only on purpose", yesCode: '{ "action": "wait_for", "selector": "#x" }', why: "A person cannot click what they cannot see. force exists for the rare deliberate case." },
+  { no: "Store results where everyone can read them", noCode: 'results/c001', yes: "Use the private per-person path", yesCode: 'data/users/me/rc/res/c001', why: "The private path is hidden even from the owner. Shared paths are readable by everyone the app is shared with." },
+  { no: "Run a timer that writes a heartbeat", noCode: 'setInterval(() => db.doc(...).set(...), 5000)', yes: "Ping when you need to know", yesCode: '{ "action": "ping" }', why: "Timer writes clutter the database. The only timer write is the lease renewal while a command runs." },
+  { no: "Add an action that runs arbitrary code", noCode: '{ "action": "eval", "code": "..." }', yes: "Register small named actions", yesCode: '{ "action": "call", "name": "addItem", "args": {...} }', why: "Whatever you add is something a command can trigger. Keep the list short and boring." },
+  { no: "Read a whole big page every time", noCode: '{ "action": "read" }  (on a huge page)', yes: "Read with a selector", yesCode: '{ "action": "read", "selector": "#results" }', why: "Results are capped, and anything over the cap is dropped with an error." },
+  { no: "Assume the page is open", noCode: 'send, then wait forever', yes: "Ping first, with a fallback", yesCode: 'ping, then open the app, then ask the person', why: "A closed page cannot answer. Commands wait, and reopening can take over a minute." },
+  { no: "Republish in the middle of a command", noCode: 'publish while a command runs', yes: "Wait until it finishes", yesCode: 'status: done', why: "A republish reloads open pages. A running command is then marked interrupted." },
+  { no: "Write a repeatable action that adds", noCode: 'items.push(text)', yes: "Carry an id and ignore a repeat", yesCode: 'if (processed.has(requestId)) return', why: "Claude, or a person, may send the same request twice." },
+  { no: "Select by position in the markup", noCode: '"div > div:nth-child(3) > button"', yes: "Ids or data-rc attributes", yesCode: '"#save"  or  "[data-rc=save]"', why: "Positions break when the layout changes. read reports the best selector for every control." },
+  { no: "Ignore warning and accepted in results", noCode: 'status: "done"  (and move on)', yes: "Check them", yesCode: '"accepted": false  →  the field changed the value', why: "A step can succeed and still tell you something important." },
+  { no: "Treat status done as the goal reached", noCode: 'status: "done"', yes: "Verify with a read", yesCode: '{ "action": "read", "selector": "#list" }', why: "Done means every step ran. It does not mean the app ended up in the state you wanted." },
+  { no: "Put secrets in commands", noCode: '"value": "my-password"', yes: "Keep secrets out of the database", yesCode: 'let the person type them', why: "Commands and results are stored documents." },
+  { no: "Leave test data around", noCode: 'hundreds of old cmd/res/snap', yes: "Clean up now and then", yesCode: 'delete old documents', why: "An app holds at most 25,000 documents in total, shared by everyone." },
+];
+PAIRS.forEach((p) => {
+  const d = document.createElement("div"); d.className = "pair";
+  d.innerHTML = '<div class="no"><span class="tag">Don\'t</span><p>' + esc(p.no) + "</p><pre>" + esc(p.noCode) + '</pre></div><div class="yes"><span class="tag">Do</span><p>' + esc(p.yes) + "</p><pre>" + esc(p.yesCode) + '</pre></div><div class="why">' + esc(p.why) + "</div>";
+  $("pairs").appendChild(d);
+});
+
+const DESIGN = [
+  ["Ids on everything Claude may touch", "Stable ids (or data-rc) give stable selectors. Wrap the app in an element with id app so read has a clear scope."],
+  ["Use the hidden attribute", "It says clearly what is not shown. Visibility is checked for real, so CSS hiding also works, but hidden is easy to read."],
+  ["Show a finished signal", "A results table, a Saved message or a spinner that goes away. Without one, a wait has nothing to wait for."],
+  ["Disable, do not just hide, unavailable buttons", "A disabled button tells a command why it cannot proceed. The bridge reports it."],
+  ["Keep text and values honest", "What is in a field is the field's value. What is in a list is its items. Both are read, so keep them consistent with what you show."],
+  ["Name the awkward things", "For anything hard to click, register a named action. Keep each small, safe to repeat, and returning small JSON."],
+  ["Keep results small", "Show less per page, or give a selector for the part that matters. A document holds at most 256 KB."],
+  ["Plan for a reload", "A republish or a reopened page starts fresh. Do not rely on state that only lives in the page."],
+];
+DESIGN.forEach((r) => { const d = document.createElement("div"); d.className = "card"; d.innerHTML = "<h3>" + esc(r[0]) + "</h3><p>" + esc(r[1]) + "</p>"; $("design-grid").appendChild(d); });
+
+const CHECKS = [
+  ["Before you publish", ["Every control Claude should use has an id.", "The app is wrapped in an element with id app.", "Hidden things use the hidden attribute.", "Slow actions show a clear finished element.", "The panel, bridge and wiring are pasted in that order, and REMOTE_ACTIONS comes before the wiring.", "Named actions are safe to run twice, validate their args and return small JSON.", "No secrets are typed into commands or kept in the database.", "Publish settings: db with the two rules, user, and mcp only if you call a connector."]],
+  ["First run", ["The panel says on.", "ping answers and visibility is visible.", "read returns your controls with the right selectors and values.", "A fill then read-back shows accepted true.", "A click on a disabled control fails with a clear message.", "A command with a typo comes back invalid and nothing in it runs.", "A wait_for on something that never appears fails the command.", "A screenshot arrives and you looked at it.", "If a connector is involved, the Allow prompt appeared and you clicked it."]],
+  ["Before you rely on it", ["You closed the page, sent a command, and saw it wait as pending.", "You know what interrupted means and you read the page before resending.", "You use read or text for exact values.", "Commands that must not run late have expires.", "Someone knows how to delete old cmd, res and snap documents.", "You ran the stress tests, and added one for anything you changed in the bridge."]],
+  ["Before you share", ["Everyone who needs remote control has Contributor access or higher.", "Each person knows to connect their own connector and click their own Allow.", "People know their channel is private, including from the owner.", "You told people the app holds at most 25,000 documents, shared by everyone."]],
+];
+const done = new Set((store.get("rc2-bp-checks") || "").split(",").filter(Boolean));
+let totalChecks = 0;
+CHECKS.forEach(([title, items], gi) => {
+  const g = document.createElement("div"); g.className = "check-group"; g.innerHTML = "<h3>" + esc(title) + "</h3>";
+  items.forEach((t, i) => {
+    const id = gi + "-" + i; totalChecks++;
+    const l = document.createElement("label"); l.innerHTML = '<input type="checkbox" data-k="' + id + '"' + (done.has(id) ? " checked" : "") + "><span>" + esc(t) + "</span>";
+    l.querySelector("input").addEventListener("change", (e) => { e.target.checked ? done.add(id) : done.delete(id); store.set("rc2-bp-checks", [...done].join(",")); progress(); });
+    g.appendChild(l);
+  });
+  $("checks").appendChild(g);
+});
+function progress() { $("prog").textContent = done.size + " of " + totalChecks + " ticked"; }
+progress();
+$("reset-checks").addEventListener("click", () => { done.clear(); store.set("rc2-bp-checks", ""); document.querySelectorAll("#checks input").forEach((i) => (i.checked = false)); progress(); });
+
+PITFALLS.forEach((p, i) => {
+  const d = document.createElement("details"); d.className = "pit";
+  d.innerHTML = '<summary><span class="pn">' + (i + 1) + "</span><span>" + esc(p.t) + '</span></summary><div class="body"><span class="lbl">What you see</span><p>' + esc(p.sym) + '</p><span class="lbl">Why it happens</span><p>' + esc(p.why) + '</p><span class="lbl">The fix</span><p>' + esc(p.fix) + "</p></div>";
+  const body = d.querySelector(".body");
+  if (p.tests.length) {
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "btn"; btn.textContent = "Run its " + (p.tests.length === 1 ? "test" : p.tests.length + " tests");
+    const res = document.createElement("div"); res.className = "tres"; res.setAttribute("aria-live", "polite");
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; res.textContent = "Running...";
+      const s = await runStressTests(null, p.tests);
+      res.innerHTML = s.results.map((r) => '<span class="t ' + (r.passed ? "ok" : "bad") + '" title="' + esc(r.error || r.why) + '">' + (r.passed ? "PASS " : "FAIL ") + esc(r.name) + "</span>").join("");
+      btn.disabled = false;
+    });
+    body.append(btn, res);
+  } else { const n = document.createElement("p"); n.className = "empty"; n.textContent = "No automatic test for this one. It is checked by design or on a real app."; body.appendChild(n); }
+  $("pit-list").appendChild(d);
+});
+</script>
+</body>
+</html>

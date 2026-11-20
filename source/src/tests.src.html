@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remote Control Stress Tests</title>
+<style>
+  :root { --bg:#f5f6f8; --panel:#fff; --fg:#1b2230; --muted:#5d6679; --line:#d7dce5; --ok:#1d6036; --okbg:#e4f4ea; --err:#8a1c1c; --errbg:#fdecec; --accent:#1f5fbf; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --panel:#1b2029; --fg:#e6e9f0; --muted:#9aa3b5; --line:#323a48; --ok:#9fe3b8; --okbg:#173223; --err:#ffb4b4; --errbg:#3a1d1d; --accent:#7ab2ff; color-scheme: dark; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui,sans-serif; }
+  main { max-width:900px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:20px; margin:0 0 4px; } p { color:var(--muted); margin:0 0 12px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:8px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; }
+  #sum { margin:14px 0; font-weight:700; }
+  .t { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin:8px 0; }
+  .t.ok { border-left:5px solid var(--ok); } .t.bad { border-left:5px solid var(--err); background:var(--errbg); }
+  .t b { display:block; } .t small { color:var(--muted); } .t code { color:var(--err); white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Remote control stress tests</h1>
+  <p>Each test builds a fresh demo app, an in-memory database and a bridge, sends real command documents, and checks what comes back. Many are negative tests: they try to break the bridge.</p>
+  <button id="go" type="button">Run all tests</button>
+  <div id="sum" aria-live="polite"></div>
+  <div id="out"></div>
+</main>
+<script>/*__BRIDGE__*/</script>
+<script>/*__FAKEDB__*/</script>
+<script>/*__DEMO_JS__*/</script>
+<script>const DEMO_APP_HTML = /*__DEMO_HTML_JSON__*/"";</script>
+<script>/*__TESTS__*/</script>
+<script>
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+document.getElementById("go").addEventListener("click", async (e) => {
+  e.target.disabled = true; const out = document.getElementById("out"); out.innerHTML = ""; document.getElementById("sum").textContent = "Running...";
+  const s = await runStressTests((r) => {
+    const d = document.createElement("div"); d.className = "t " + (r.passed ? "ok" : "bad");
+    d.innerHTML = "<b>" + (r.passed ? "PASS" : "FAIL") + " · " + esc(r.name) + " <small>(" + r.ms + " ms)</small></b><small>" + esc(r.why) + "</small>" + (r.error ? "<br><code>" + esc(r.error) + "</code>" : "");
+    out.appendChild(d);
+  });
+  document.getElementById("sum").textContent = s.passed + " passed, " + s.failed + " failed, " + (s.passed + s.failed) + " total";
+  window.__stress = s; e.target.disabled = false;
+});
+</script>
+</body>
+</html>

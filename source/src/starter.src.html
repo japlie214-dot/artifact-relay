@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>My Remote Controlled App</title>
+<style>
+  /* Skeleton: put your app inside #app. Everything marked "keep" is the remote control. */
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --fg: #1b2230; --muted: #5d6679; --line: #d7dce5;
+    --accent: #1f5fbf; --accent-fg: #ffffff; --ok: #1d6036; --warn: #9a5b00; --err: #8a1c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+      --accent: #7ab2ff; --accent-fg: #0d1a33; --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+    --accent: #7ab2ff; --accent-fg: #0d1a33; --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+    color-scheme: dark;
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding-block: 20px; display: grid; gap: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 18px; margin: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+  button { background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 6px; padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+  [hidden] { display: none !important; }
+
+/*__RC_CSS__*/
+</style>
+</head>
+<body>
+<main>
+  <h1>My Remote Controlled App</h1>
+
+  <!-- ===================== YOUR APP: replace everything inside #app ===================== -->
+  <!-- Rules of thumb: give every control an id; use the hidden attribute to hide things;
+       show a clear "finished" element (a results table, a "Saved" message) so waits have something to wait for. -->
+  <section class="panel" id="app">
+    <label for="name">Your name</label>
+    <input id="name" type="text" placeholder="Type a name">
+    <div class="row"><button id="greet" type="button">Say hello</button></div>
+    <p id="greeting" hidden></p>
+  </section>
+  <!-- ==================================================================================== -->
+
+<!--__RC_PANEL__-->
+</main>
+
+<!-- keep: used for screenshots -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+/* ===================== YOUR APP LOGIC ===================== */
+document.getElementById("greet").addEventListener("click", () => {
+  const name = document.getElementById("name").value.trim();
+  const out = document.getElementById("greeting");
+  out.textContent = name ? "Hello, " + name + "!" : "Please type a name first.";
+  out.hidden = false;
+});
+
+// Named actions Claude can run with {"action":"call","name":"greet","args":{"name":"Ada"}}.
+// Use them for things that are awkward to click. Return small JSON. Make them safe to run twice.
+window.REMOTE_ACTIONS = {
+  greet: async ({ name }) => { document.getElementById("name").value = String(name || ""); document.getElementById("greet").click(); return { shown: document.getElementById("greeting").textContent }; },
+};
+/* ========================================================== */
+
+/*__BRIDGE__*/
+
+/*__RC_WIRING__*/
+</script>
+</body>
+</html>

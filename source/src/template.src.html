@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Remote Control Template</title>
+<style>
+  /* Layout: your app on top (#app), the remote-control panel underneath (#rc).
+     Replace the demo task list. Keep the #rc panel, the bridge and the wiring. */
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --fg: #1b2230; --muted: #5d6679; --line: #d7dce5;
+    --accent: #1f5fbf; --accent-fg: #ffffff; --chip: #eceff4; --ok: #1d6036; --warn: #9a5b00; --err: #8a1c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+      --accent: #7ab2ff; --accent-fg: #0d1a33; --chip: #262d3a; --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+    --accent: #7ab2ff; --accent-fg: #0d1a33; --chip: #262d3a; --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+    color-scheme: dark;
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding-block: 20px; display: grid; gap: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+  .field { margin-bottom: 10px; display: grid; gap: 4px; }
+  label { font-weight: 600; font-size: 13px; }
+  input[type=text], textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+  select { width: auto; }
+  button { background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 6px; padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .chk { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
+  ul { margin: 0 0 10px; padding-left: 20px; min-height: 22px; }
+  li { margin: 4px 0; }
+  .muted, small { color: var(--muted); font-size: 12px; }
+  [hidden] { display: none !important; }
+
+/*__RC_CSS__*/
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Remote Control Template</h1>
+    <p class="sub">A demo task list plus the remote-control bridge. Replace the demo with your app and keep the bridge.</p>
+  </header>
+
+  <!-- ===================== YOUR APP (replace this block) ===================== -->
+  <section class="panel" id="app">
+<!--__DEMO_APP_HTML__-->
+  </section>
+  <!-- ========================================================================= -->
+
+<!--__RC_PANEL__-->
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+/* ===================== YOUR APP LOGIC (replace this block) ===================== */
+/*__DEMO_JS__*/
+const demo = mountDemoApp(document.getElementById("app"));
+// Named actions Claude can run with {"action":"call","name":"addTask","args":{...}}.
+// Use them for things that are awkward to click. Return small, JSON-serializable data. Make them safe to run twice.
+window.REMOTE_ACTIONS = demo.actions;
+/* ================================================================================ */
+
+/*__BRIDGE__*/
+
+/*__RC_WIRING__*/
+</script>
+</body>
+</html>

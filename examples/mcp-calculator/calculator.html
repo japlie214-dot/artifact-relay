@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Relay Calculator</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { --bg: #ffffff; --fg: #1a1a1a; --field: #f1f1f1; --line: #b5b5b5; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121212; --fg: #f2f2f2; --field: #3d3d3d; --line: #6a6a6a; } }
+  body { margin: 0; padding: 16px; color: var(--fg); background: var(--bg); font: 15px system-ui, sans-serif; }
+  main { max-width: 32rem; margin-inline: auto; }
+  h1 { margin: 0 0 12px; font-size: 1.35rem; }
+  form, label { display: grid; gap: 8px; }
+  .inputs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; }
+  input, select, button { font: inherit; padding: 8px; min-width: 0; color: var(--fg); background: var(--field); border: 1px solid var(--line); border-radius: 4px; }
+  button + button { margin-inline-start: 6px; }
+  output { display: block; min-height: 2em; margin-top: 12px; font-weight: 600; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Relay Calculator</h1>
+  <form id="calculator">
+    <div class="inputs">
+      <label>First number <input id="left" type="number" step="any" required></label>
+      <label>Operator <select id="operation">
+        <option value="add">+</option><option value="subtract">−</option>
+        <option value="multiply">×</option><option value="divide">÷</option>
+      </select></label>
+      <label>Second number <input id="right" type="number" step="any" required></label>
+    </div>
+    <div><button id="calculate" type="submit" disabled>Calculate</button><button type="reset">Clear</button></div>
+  </form>
+  <output id="result" for="left operation right" aria-live="polite"></output>
+  <div id="connection" role="status">Connecting to the MCP host…</div>
+  <button id="arm" type="button" disabled>Arm Relay for one action</button>
+  <p id="relay-status" role="status"></p>
+  <p id="relay-last" role="status"></p>
+</main>
+<!-- CALCULATOR_SCRIPT -->
+</body>
+</html>

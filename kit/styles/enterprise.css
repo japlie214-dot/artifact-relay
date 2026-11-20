@@ -1,0 +1,30 @@
+/* structure every style keeps: the body collapses, the log scrolls inside its own box, the header mirror of the agent line is hidden unless a style shows it */
+#rc * { box-sizing: border-box; }
+#rc[data-collapsed="true"] .rc-body { display: none; }
+#rc .rc-mini { display: none; }
+#rc .rc-log { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+#rc .rc-log:empty::before { content: "No activity yet"; display: block; padding: 8px 10px; opacity: .55; }
+#rc .rc-detail:empty { display: none; }
+/* enterprise: light grey, square corners, tag-style status, a data-table log. Inspired by the IBM Carbon system. Brings its own colours. */
+#rc { margin-top: 28px; background: #fff; color: #161616; border: 1px solid #e0e0e0; border-top: 3px solid #0f62fe; font: 14px/1.4 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: .16px; }
+#rc .rc-head { display: flex; align-items: center; gap: 12px; padding: 0 8px 0 16px; height: 48px; background: #f4f4f4; border-bottom: 1px solid #e0e0e0; }
+#rc .rc-head h2 { margin: 0; font-size: 14px; font-weight: 600; flex: 1; }
+#rc .rc-dot { display: none; }
+#rc .rc-pill { font-size: 12px; line-height: 18px; padding: 2px 8px; border-radius: 24px; background: #ffd7d9; color: #a2191f; }
+#rc .rc-pill[data-s="on"] { background: #a7f0ba; color: #044317; } #rc .rc-pill[data-s="running"] { background: #bae6ff; color: #003a6d; } #rc .rc-pill[data-s="paused"] { background: #fddc69; color: #483700; }
+#rc .rc-toggle { border: 0; background: transparent; color: #161616; width: 32px; height: 32px; cursor: pointer; }
+#rc .rc-toggle:hover { background: #e8e8e8; } #rc[data-collapsed="true"] .rc-toggle { transform: rotate(-90deg); }
+#rc .rc-body { padding: 0; }
+#rc .rc-grid { display: grid; grid-template-columns: 140px 1fr; }
+#rc .rc-grid > div { padding: 12px 16px; border-bottom: 1px solid #e0e0e0; }
+#rc .rc-k { font-size: 12px; color: #525252; }
+#rc #rc-lock { font-weight: 600; } #rc #rc-lock[data-s="busy"], #rc #rc-lock[data-s="held"] { color: #8e6a00; }
+#rc .rc-pause { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; } #rc .rc-pause input { accent-color: #0f62fe; width: 16px; height: 16px; }
+#rc .rc-detail { padding: 8px 16px; color: #525252; font-size: 12px; border-bottom: 1px solid #e0e0e0; }
+#rc .rc-log { max-height: 176px; background: #fff; font-size: 13px; }
+#rc .rc-log li { display: grid; grid-template-columns: 110px 1fr; gap: 16px; padding: 8px 16px; border-bottom: 1px solid #e0e0e0; border-left: 3px solid transparent; }
+#rc .rc-log li:nth-child(even) { background: #f9f9f9; }
+#rc .rc-log time { color: #525252; font-size: 12px; font-variant-numeric: tabular-nums; }
+#rc .rc-log li[data-k="warn"] { border-left-color: #f1c21b; background: #fcf4d6; } #rc .rc-log li[data-k="bad"] { border-left-color: #da1e28; background: #fff1f1; } #rc .rc-log li[data-k="ok"] { border-left-color: #24a148; }
+#rc .rc-note { padding: 10px 16px; color: #6f6f6f; font-size: 12px; background: #f4f4f4; }
+#rc .rc-sub { padding: 10px 16px 6px; font-size: 12px; font-weight: 600; color: #525252; }

@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Snowflake Chart Maker</title>
+<style>
+  /* Colour tokens. Light values on :root; dark values repeated in both dark blocks. */
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --fg: #1b2230; --muted: #5d6679; --line: #d7dce5;
+    --accent: #1f5fbf; --accent-fg: #ffffff; --code-bg: #f0f2f6;
+    --err-bg: #fdecec; --err-fg: #8a1c1c; --ok-bg: #e9f6ee; --ok-fg: #1d6036;
+    --ok: #1d6036; --warn: #9a5b00; --err: #8a1c1c;
+    --c1: #1f5fbf; --c2: #c4641a; --c3: #23876a; --c4: #b8325c; --c5: #6b4fbb; --c6: #7d7a12;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+      --accent: #7ab2ff; --accent-fg: #0d1a33; --code-bg: #141821;
+      --err-bg: #3a1d1d; --err-fg: #ffb4b4; --ok-bg: #173223; --ok-fg: #9fe3b8;
+      --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+      --c1: #7ab2ff; --c2: #f0a050; --c3: #5fcf9a; --c4: #f07a9a; --c5: #b39cf0; --c6: #d9c35a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+    --accent: #7ab2ff; --accent-fg: #0d1a33; --code-bg: #141821;
+    --err-bg: #3a1d1d; --err-fg: #ffb4b4; --ok-bg: #173223; --ok-fg: #9fe3b8;
+    --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+    --c1: #7ab2ff; --c2: #f0a050; --c3: #5fcf9a; --c4: #f07a9a; --c5: #b39cf0; --c6: #d9c35a;
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 960px; margin: 0 auto; display: grid; gap: 16px; min-width: 0;
+    padding-block: 20px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1 { font-size: 18px; margin: 0; font-weight: 650; }
+  h2 { font-size: 15px; margin: 0 0 10px; font-weight: 650; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .app { display: grid; gap: 16px; min-width: 0; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px; min-width: 0;
+  }
+  .hint { color: var(--muted); font-size: 12px; }
+  label.hint { display: block; margin-bottom: 6px; }
+  textarea {
+    display: block; width: 100%; box-sizing: border-box; min-height: 130px; resize: vertical;
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 10px; font: 13px/1.5 ui-monospace, Consolas, "Cascadia Mono", monospace;
+  }
+  select {
+    width: 100%; box-sizing: border-box; min-width: 0;
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 7px 8px; font: inherit;
+  }
+  select[multiple] { min-height: 96px; }
+  textarea:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button {
+    background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 6px;
+    padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+  .controls {
+    display: grid; gap: 12px; margin-bottom: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .controls > div { min-width: 0; }
+  .controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .status { border-radius: 6px; padding: 10px 12px; margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .status.err { background: var(--err-bg); color: var(--err-fg); }
+  .status.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .status.info { color: var(--muted); padding-left: 0; }
+  .meta { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; max-width: 100%; }
+  table { border-collapse: collapse; width: 100%; font: 13px/1.4 ui-monospace, Consolas, monospace; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--code-bg); font-weight: 650; }
+  td.null { color: var(--muted); font-style: italic; }
+  .chart-wrap { position: relative; height: 360px; min-width: 0; }
+  .chart-empty { color: var(--muted); text-align: center; padding: 48px 12px; border: 1px dashed var(--line); border-radius: 6px; margin: 0; }
+  #export-msg { margin: 10px 0 0; min-height: 1.5em; }
+  #export-msg.err { color: var(--err); }
+  #export-msg.ok { color: var(--ok); }
+  #export-msg.info { color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+<link rel="stylesheet" href="rc/rc-panel.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Snowflake Chart Maker</h1>
+    <p class="sub">Runs a read-only SQL statement through the Snowflake connector on your Claude account, then charts the result. This page holds no Snowflake credentials.</p>
+  </header>
+
+  <!-- ===================== YOUR APP: everything inside #app ===================== -->
+  <div id="app" class="app">
+
+    <section class="panel" aria-labelledby="query-title">
+      <h2 id="query-title">Query</h2>
+      <label for="sql" class="hint">SQL (one read-only statement: SELECT, WITH, SHOW, DESCRIBE or EXPLAIN)</label>
+      <textarea id="sql" spellcheck="false">SELECT CURRENT_USER(), CURRENT_ROLE();</textarea>
+      <div class="row">
+        <button id="run" type="button">Run query</button>
+        <span class="hint">Ctrl/Cmd + Enter also runs.</span>
+      </div>
+      <p id="status" class="status info" hidden></p>
+    </section>
+
+    <section class="panel" id="results-panel" aria-labelledby="results-title" hidden>
+      <h2 id="results-title">Result</h2>
+      <p id="meta" class="meta"></p>
+      <div class="table-wrap" id="table-wrap">
+        <table id="result-table"><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="chart-title">
+      <h2 id="chart-title">Chart</h2>
+      <div class="controls">
+        <div>
+          <label for="chart-type">Chart type</label>
+          <select id="chart-type">
+            <option value="bar">Bar</option>
+            <option value="line">Line</option>
+            <option value="pie">Pie</option>
+          </select>
+        </div>
+        <div>
+          <label for="x-col">Labels (X)</label>
+          <select id="x-col"></select>
+        </div>
+        <div>
+          <label for="y-cols">Values (Y, numeric)</label>
+          <select id="y-cols" multiple></select>
+        </div>
+      </div>
+      <p id="chart-empty" class="chart-empty">Run a query to draw a chart.</p>
+      <div class="chart-wrap" id="chart-wrap" hidden>
+        <canvas id="chart-canvas" role="img" aria-label="Chart of the query result"></canvas>
+      </div>
+      <p id="chart-note" class="hint" hidden></p>
+      <div class="row">
+        <button id="export-png" type="button" disabled>Export PNG</button>
+        <span class="hint">Saves the chart as a PNG with a solid background.</span>
+      </div>
+      <p id="export-msg" class="info" role="status" aria-live="polite"></p>
+    </section>
+
+  </div>
+  <!-- ==================================================================================== -->
+
+  <section id="rc" aria-live="polite">
+    <h2>Claude remote control</h2>
+    <div>Status: <span id="rc-state" data-s="off">starting...</span><span id="rc-detail"></span>
+      <label class="rc-pause" for="rc-pause"><input id="rc-pause" type="checkbox"> Pause</label></div>
+    <div>Agent: <span id="rc-lock" data-s="free">free</span></div>
+    <div class="rc-note">Private channel: only you, from your own Claude session, can drive this page. Results and screenshots stay in your private area.</div>
+    <ol id="rc-log"></ol>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="rc/bridge.js"></script>
+<script>
+/* ===================== YOUR APP LOGIC ===================== */
+const CONNECTOR = "SNOWFLAKE SQL EXECUTE";
+const TOOL = "sql_exec_tool";
+const MAX_ROWS = 500;   // rows kept from the result
+const SHOW_ROWS = 100;  // rows shown in the table and drawn in the chart
+const NUMERIC_TYPES = new Set(["fixed", "real", "float", "float4", "float8", "double", "number", "decimal", "numeric", "int", "integer", "bigint", "smallint", "tinyint", "byteint"]);
+const NON_NUMERIC_HINT = /text|char|string|date|time|bool|variant|object|array|binary|geo/;
+const NUMBER_RE = /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i;
+const SERIES_VARS = ["--c1", "--c2", "--c3", "--c4", "--c5", "--c6"];
+const ALLOWED_START = ["SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN"];
+const WRITE_WORDS = /\b(INSERT|UPDATE|DELETE|MERGE|CREATE|DROP|ALTER|TRUNCATE|COPY|PUT|GRANT|REVOKE|CALL|EXECUTE|REMOVE)\b/i;
+
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const tok = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+let chart = null;     // the Chart.js instance
+let model = null;     // { cols:[{name,type,numeric,ts}], rows:[[raw strings]], total, queryId }
+let runTimer = null;
+
+/* ---------- status line ---------- */
+function setStatus(kind, text) {
+  const s = $("status");
+  if (!text) { s.hidden = true; s.textContent = ""; return; }
+  s.hidden = false;
+  s.className = "status " + kind;
+  s.textContent = text;
+}
+
+/* ---------- guard: this page is for reading data ---------- */
+function stripComments(s) {
+  return s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
+function readOnlyProblem(sql) {
+  const body = stripComments(sql).trim().replace(/;+\s*$/, "").trim();
+  if (!body) return "Enter a SQL statement first.";
+  if (body.includes(";")) return "Run one statement at a time. Remove the extra semicolon.";
+  const first = (body.match(/^[A-Za-z]+/) || [""])[0].toUpperCase();
+  if (!ALLOWED_START.includes(first)) return "Only read-only statements run here: SELECT, WITH, SHOW, DESCRIBE or EXPLAIN.";
+  if (WRITE_WORDS.test(body)) return "This statement contains a word that changes data (for example INSERT, UPDATE, DELETE, CREATE or DROP). Remove it and run again.";
+  return null;
+}
+
+/* ---------- connector errors ---------- */
+function errorText(err) {
+  switch (err && err.code) {
+    case "needs_reauth":
+      return "Your Snowflake connector needs to be signed in again. Reconnect it in claude.ai Settings > Connectors, then run the query again.";
+    case "server_not_connected":
+    case "not_in_manifest":
+      return "The Snowflake connector is not connected to your account. Add it in claude.ai Settings > Connectors.";
+    case "selection_required":
+      return "More than one Snowflake connector is available. Choose one when Claude asks, then run the query again.";
+    case "approval_required":
+      return "This query needs your approval. Run it again and allow the request when asked.";
+    case "consent_required":
+      return "Access to the Snowflake connector was not allowed for this page. Run the query again and allow it.";
+    case "tool_error": {
+      const r = err.result;
+      const msg = (r && r.content && r.content[0] && r.content[0].text) || err.message;
+      return "Snowflake reported an error:\n" + msg;
+    }
+    case "server_unavailable":
+      return "Snowflake did not respond. Try again in a moment.";
+    case "cancelled":
+      return "The query was cancelled before it finished.";
+    default:
+      return "Query failed: " + (err && err.message ? err.message : String(err));
+  }
+}
+
+/* ---------- parse the connector payload into columns and rows ---------- */
+function parsePayload(p) {
+  if (typeof p === "string") { try { p = JSON.parse(p); } catch (_) {} }
+  return p;
+}
+function buildModel(payload) {
+  const p = parsePayload(payload);
+  const rs = p && p.result_set;
+  if (!rs) return null;
+  const meta = (rs.resultSetMetaData && rs.resultSetMetaData.rowType) || [];
+  const data = rs.data || [];
+  const cols = meta.map((c, i) => {
+    const type = String(c.type || "").toLowerCase();
+    const values = data.map((r) => r[i]).filter((v) => v !== null && v !== undefined);
+    let numeric = NUMERIC_TYPES.has(type);
+    if (!numeric && type && !NON_NUMERIC_HINT.test(type) && values.length) {
+      numeric = values.every((v) => NUMBER_RE.test(String(v)));
+    }
+    const ts = type === "timestamp_ltz" || type === "timestamp_tz";
+    return { name: String(c.name || ("col" + (i + 1))), type, numeric, ts };
+  });
+  const total = (rs.resultSetMetaData && Number(rs.resultSetMetaData.numRows)) || data.length;
+  return {
+    cols,
+    rows: data.slice(0, MAX_ROWS),
+    total,
+    queryId: p.query_id || null,
+  };
+}
+// Shows a raw cell as text. Epoch-style timestamps (seconds) are shown as local date and time.
+function cellText(col, v) {
+  if (v === null || v === undefined) return null;
+  if (col.ts && NUMBER_RE.test(String(v))) {
+    const d = new Date(Number(v) * 1000);
+    if (!isNaN(d)) return d.toLocaleString();
+  }
+  return String(v);
+}
+
+/* ---------- results table ---------- */
+function renderTable() {
+  const thead = $("thead"), tbody = $("tbody");
+  thead.innerHTML = "<tr>" + model.cols.map((c) => "<th>" + esc(c.name) + "</th>").join("") + "</tr>";
+  tbody.innerHTML = model.rows.slice(0, SHOW_ROWS).map((row) =>
+    "<tr>" + model.cols.map((c, i) => {
+      const t = cellText(c, row[i]);
+      return t === null ? '<td class="null">NULL</td>' : "<td>" + esc(t) + "</td>";
+    }).join("") + "</tr>"
+  ).join("");
+  let meta = model.total + " row(s) returned";
+  if (model.total > model.rows.length) meta += " (the page received " + model.rows.length + ")";
+  if (model.rows.length > SHOW_ROWS) meta += ". The table and chart show the first " + SHOW_ROWS + ".";
+  if (model.queryId) meta += " Query " + model.queryId + ".";
+  $("meta").textContent = meta;
+}
+
+/* ---------- chart controls and drawing ---------- */
+function populateControls() {
+  const xSel = $("x-col"), ySel = $("y-cols");
+  const firstNonNumeric = model.cols.findIndex((c) => !c.numeric);
+  const xDefault = firstNonNumeric >= 0 ? firstNonNumeric : 0;
+  xSel.innerHTML = model.cols.map((c, i) => '<option value="' + i + '">' + esc(c.name) + "</option>").join("");
+  xSel.value = String(xDefault);
+  const numericIdx = model.cols.map((c, i) => (c.numeric ? i : -1)).filter((i) => i >= 0);
+  ySel.innerHTML = numericIdx.map((i) =>
+    '<option value="' + i + '"' + (i !== xDefault ? " selected" : "") + ">" + esc(model.cols[i].name) + "</option>"
+  ).join("");
+  // If every numeric column was also the X column, select the numeric columns anyway.
+  if (![...ySel.options].some((o) => o.selected) && ySel.options.length) ySel.options[0].selected = true;
+}
+
+function clearChart(message) {
+  if (chart) { chart.destroy(); chart = null; }
+  $("chart-wrap").hidden = true;
+  $("chart-note").hidden = true;
+  const empty = $("chart-empty");
+  empty.hidden = false;
+  empty.textContent = message || "Run a query to draw a chart.";
+  $("export-png").disabled = true;
+}
+
+function drawChart() {
+  if (!model) { clearChart(); return; }
+  if (typeof Chart === "undefined") {
+    clearChart("Chart.js did not load, so the chart cannot be drawn. Reload the page.");
+    return;
+  }
+  const type = $("chart-type").value;
+  const xi = Number($("x-col").value);
+  const yis = [...$("y-cols").selectedOptions].map((o) => Number(o.value));
+  const rows = model.rows.slice(0, SHOW_ROWS);
+
+  if (!model.cols.some((c) => c.numeric)) { clearChart("This result has no numeric column to plot. Write a query that returns a number."); return; }
+  if (!yis.length) { clearChart("Select at least one numeric column for the values (Y)."); return; }
+  if (!rows.length) { clearChart("The query returned no rows, so there is nothing to chart."); return; }
+
+  const used = type === "pie" ? [yis[0]] : yis;
+  const series = SERIES_VARS.map(tok);
+  const fg = tok("--fg"), muted = tok("--muted"), line = tok("--line"), panel = tok("--panel");
+  const labels = rows.map((r) => {
+    const t = cellText(model.cols[xi], r[xi]);
+    return t === null ? "NULL" : t;
+  });
+  const datasets = used.map((yi, k) => {
+    const data = rows.map((r) => (r[yi] === null || r[yi] === undefined || r[yi] === "" ? null : Number(r[yi])));
+    const color = series[k % series.length];
+    if (type === "pie") {
+      return {
+        label: model.cols[yi].name, data,
+        backgroundColor: labels.map((_, i) => series[i % series.length]),
+        borderColor: panel, borderWidth: 2,
+      };
+    }
+    if (type === "line") {
+      return { label: model.cols[yi].name, data, borderColor: color, backgroundColor: color, pointRadius: 3, tension: 0.25, fill: false };
+    }
+    return { label: model.cols[yi].name, data, backgroundColor: color, borderColor: color, borderWidth: 0 };
+  });
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: {
+      legend: { display: type === "pie" || datasets.length > 1, labels: { color: fg } },
+    },
+  };
+  if (type !== "pie") {
+    options.scales = {
+      x: { ticks: { color: muted, maxRotation: 45, autoSkip: true }, grid: { color: line } },
+      y: { beginAtZero: type === "bar", ticks: { color: muted }, grid: { color: line } },
+    };
+  }
+
+  $("chart-empty").hidden = true;
+  $("chart-wrap").hidden = false;
+  const note = $("chart-note");
+  note.hidden = false;
+  note.textContent = (type === "pie" ? "Pie charts use only the first value column (" + model.cols[yis[0]].name + "). " : "") +
+    (rows.length < model.rows.length || model.total > SHOW_ROWS ? "Drawn from the first " + rows.length + " rows." : "");
+  note.hidden = !note.textContent;
+
+  if (chart) chart.destroy();
+  chart = new Chart($("chart-canvas"), { type, data: { labels, datasets }, options });
+  $("export-png").disabled = false;
+}
+
+/* ---------- show a result ---------- */
+function showResult() {
+  $("results-panel").hidden = false;
+  if (!model.cols.length) {
+    setStatus("ok", "The statement ran and returned no columns.");
+    $("results-panel").hidden = true;
+    clearChart("No columns were returned, so there is nothing to chart.");
+    return;
+  }
+  renderTable();
+  populateControls();
+  $("table-wrap").hidden = false;
+  drawChart();
+  setStatus("ok", "Done. " + model.total + " row(s) returned.");
+}
+
+function clearResults() {
+  model = null;
+  $("results-panel").hidden = true;
+  $("thead").innerHTML = "";
+  $("tbody").innerHTML = "";
+  clearChart();
+}
+
+/* ---------- run the query through the viewer's Snowflake connector ---------- */
+async function runQuery() {
+  const sql = $("sql").value;
+  const problem = readOnlyProblem(sql);
+  if (problem) { clearResults(); setStatus("err", problem); return; }
+
+  const btn = $("run");
+  btn.disabled = true;
+  setStatus("info", "Running query...");
+  clearTimeout(runTimer);
+  runTimer = setTimeout(() => {
+    if (btn.disabled) setStatus("info", "Still running. If Snowflake asks you to allow access, press Allow in that prompt. This page cannot press it for you.");
+  }, 8000);
+  try {
+    const api = window.claude;
+    const mcp = api ? await api.use("mcp") : null;
+    if (!mcp) {
+      clearResults();
+      setStatus("err", "This view cannot reach the Snowflake connector. Open the app in claude.ai.");
+      return;
+    }
+    const result = await mcp.callTool(CONNECTOR, TOOL, { sql: sql.trim().replace(/;+\s*$/, "") });
+    const next = buildModel(result.payload);
+    if (!next) {
+      clearResults();
+      setStatus("ok", "The statement ran, but no result set came back.");
+    } else {
+      model = next;
+      showResult();
+    }
+  } catch (err) {
+    clearResults();
+    setStatus("err", errorText(err));
+  } finally {
+    clearTimeout(runTimer);
+    btn.disabled = false;
+  }
+}
+
+/* ---------- export the chart as PNG ---------- */
+function setExportMsg(kind, text) {
+  const m = $("export-msg");
+  m.className = kind;
+  m.textContent = text;
+}
+
+async function exportPng() {
+  if (!chart) { setExportMsg("err", "Draw a chart first."); return; }
+  const source = $("chart-canvas");
+  setExportMsg("info", "Preparing the PNG...");
+  try {
+    // Copy the chart onto a solid background so the PNG is not transparent.
+    const off = document.createElement("canvas");
+    off.width = source.width;
+    off.height = source.height;
+    const ctx = off.getContext("2d");
+    ctx.fillStyle = tok("--panel") || "#ffffff";
+    ctx.fillRect(0, 0, off.width, off.height);
+    ctx.drawImage(source, 0, 0);
+    const blob = await new Promise((resolve, reject) => {
+      off.toBlob((b) => (b ? resolve(b) : reject(new Error("The browser could not encode the chart as PNG."))), "image/png");
+    });
+
+    const api = window.claude;
+    const downloads = api ? await api.use("downloads") : null;
+    if (!downloads) {
+      setExportMsg("err", "Saving files is not available in this view. Open the app in claude.ai to export the PNG.");
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const res = await downloads.save({ filename: "snowflake-chart-" + stamp + ".png", data: blob });
+    setExportMsg("ok", res && res.status === "saved" ? "PNG saved." : "PNG handed to your browser.");
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "declined") setExportMsg("err", "Export cancelled. Nothing was saved.");
+    else if (code === "rate_limited") setExportMsg("err", "Too many save prompts at once. Wait a moment and try again.");
+    else if (code === "too_large") setExportMsg("err", "The PNG is too large to save from this view.");
+    else if (code === "unavailable" || code === "not_granted" || code === "capability_disabled") setExportMsg("err", "Saving files is not available in this view.");
+    else setExportMsg("err", "Export failed: " + ((err && err.message) || code || String(err)));
+  }
+}
+
+/* ---------- wiring ---------- */
+$("run").addEventListener("click", runQuery);
+$("sql").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runQuery(); }
+});
+$("chart-type").addEventListener("change", drawChart);
+$("x-col").addEventListener("change", drawChart);
+$("y-cols").addEventListener("change", drawChart);
+$("export-png").addEventListener("click", exportPng);
+// Redraw when the system switches between light and dark, so the chart colours follow the theme.
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (chart) drawChart(); });
+}
+
+window.REMOTE_ACTIONS = {};
+/* ========================================================== */
+</script>
+<script src="rc/rc-wiring.js"></script>
+</body>
+</html>

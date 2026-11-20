@@ -1,0 +1,6 @@
+{
+  "name": "claude-app-remote-control",
+  "version": "0.1.0",
+  "description": "Artifact Relay: operate published Claude apps from a Claude session: a command channel, session identity stamped by a hook, a busy lock, and a starter kit with panel styles.",
+  "author": { "name": "Remote Control kit" }
+}

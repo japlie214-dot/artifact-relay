@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artifact Relay Best Practices</title>
+<style>
+  /* One long, scannable page: golden rules, do and don't pairs, a tickable checklist, the pitfalls with live tests. */
+  :root {
+    --bg: #eef1f5; --surface: #ffffff; --ink: #16202b; --muted: #566474; --line: #d3dae3; --brand: #0b6e83; --brand-ink: #ffffff;
+    --good: #17693f; --good-bg: #e4f4ea; --bad: #9b1c1c; --bad-bg: #fdecec; --warn: #a85400; --warn-bg: #fff2df; --chip: #e7ecf2;
+    --code-bg: #0f1923; --code-fg: #dbe6f0; --c-kw: #ffb454; --c-str: #8bd5a0; --c-num: #f2a0a0; --c-key: #7ec8e3; --c-com: #70879b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1318; --surface: #161f29; --ink: #e5ecf3; --muted: #9aa9b8; --line: #2b3947; --brand: #4cc3dc; --brand-ink: #062029;
+      --good: #6fd6a0; --good-bg: #12281d; --bad: #ff9d9d; --bad-bg: #331a1a; --warn: #ffb454; --warn-bg: #2c2112; --chip: #202c38; --code-bg: #0a1016;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1318; --surface: #161f29; --ink: #e5ecf3; --muted: #9aa9b8; --line: #2b3947; --brand: #4cc3dc; --brand-ink: #062029;
+    --good: #6fd6a0; --good-bg: #12281d; --bad: #ff9d9d; --bad-bg: #331a1a; --warn: #ffb454; --warn-bg: #2c2112; --chip: #202c38; --code-bg: #0a1016;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  code, pre { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  :not(pre) > code { background: var(--chip); padding: 1px 6px; border-radius: 4px; font-size: .9em; }
+  a { color: var(--brand); }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  header.top { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); padding: 10px max(16px, 3vw); display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  header.top b { font-size: 17px; } header.top b span { color: var(--brand); }
+  header.top nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; flex: 1; }
+  .ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px max(16px, 3vw) 80px; }
+  section { margin: 0 0 44px; scroll-margin-top: 70px; }
+  h1 { font-size: 30px; margin: 0 0 6px; text-wrap: balance; } h2 { font-size: 24px; margin: 0 0 8px; text-wrap: balance; } h3 { font-size: 17px; margin: 22px 0 6px; }
+  p { margin: 0 0 12px; max-width: 72ch; } .lead { color: var(--muted); font-size: 18px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin: 14px 0; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; } .card p { margin: 0; font-size: 14px; color: var(--muted); }
+  .card .n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-size: 12px; font-weight: 700; margin-right: 8px; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 10px 0; }
+  .pair > div { padding: 12px 14px; min-width: 0; }
+  .pair .no { background: var(--bad-bg); border-right: 1px solid var(--line); } .pair .yes { background: var(--good-bg); }
+  .pair .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+  .pair .no .tag { color: var(--bad); } .pair .yes .tag { color: var(--good); }
+  .pair p { margin: 0 0 6px; font-size: 14px; } .pair .why { grid-column: 1 / -1; padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); background: var(--surface); }
+  .pair pre { margin: 4px 0 0; padding: 8px 10px; background: var(--code-bg); color: var(--code-fg); border-radius: 6px; font-size: 12px; overflow-x: auto; }
+  @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } .pair .no { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+  .check-group { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+  .check-group h3 { margin: 0 0 6px; }
+  .check-group label { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; cursor: pointer; font-size: 15px; }
+  .check-group input { margin-top: 5px; }
+  .check-group input:checked + span { color: var(--muted); text-decoration: line-through; }
+  .prog { font-weight: 700; margin: 6px 0; }
+  details.pit { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 8px 0; padding: 0 14px; }
+  details.pit summary { cursor: pointer; padding: 12px 0; font-weight: 650; display: flex; gap: 10px; }
+  details.pit summary .pn { color: var(--brand); font-size: 13px; }
+  details.pit .body { padding: 0 0 14px; font-size: 15px; } details.pit .body p { margin: 0 0 8px; }
+  details.pit .lbl { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-top: 6px; }
+  .btn { background: var(--chip); color: var(--ink); border: 0; border-radius: 8px; padding: 7px 14px; font: inherit; font-weight: 650; cursor: pointer; }
+  .btn:disabled { opacity: .5; }
+  .tres { margin-top: 8px; font-size: 14px; }
+  .tres .t { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 650; }
+  .tres .t.ok { background: var(--good-bg); color: var(--good); } .tres .t.bad { background: var(--bad-bg); color: var(--bad); }
+  .note { border-left: 4px solid var(--warn); background: var(--warn-bg); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; max-width: 76ch; font-size: 15px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; } th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; } th { background: var(--bg); font-size: 13px; } tr:last-child td { border-bottom: 0; }
+  .empty { color: var(--muted); font-size: 13px; font-style: italic; }
+  .k { color: var(--c-key); } .s { color: var(--c-str); } .w { color: var(--c-kw); }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <b>Remote control <span>best practices</span></b>
+  <nav aria-label="Sections"><a href="#rules">Golden rules</a><a href="#dodont">Do and don't</a><a href="#design">Design your app</a><a href="#checklist">Checklist</a><a href="#pitfalls">Pitfalls and tests</a><a href="#status">What is tested</a></nav>
+  <button class="ghost" id="theme" type="button">Theme</button>
+</header>
+
+<main>
+  <h1>What to do, and what not to do</h1>
+  <p class="lead">One page to read before you build, and to check against before you publish. Every item comes from testing a real app. The pitfalls at the bottom can run their own tests right here.</p>
+  <p>Looking for something to copy? The <code>kit</code> folder has a skeleton app, the separate remote-control files, publish settings and ready-made sentences for Claude. <a href="learn.html">learn.html</a> teaches the whole idea.</p>
+
+  <section id="rules">
+    <h2>Golden rules</h2>
+    <div class="grid" id="rules-grid"></div>
+  </section>
+
+  <section id="dodont">
+    <h2>Do and don't</h2>
+    <p>Each pair shows the habit that caused trouble and the one that fixed it.</p>
+    <div id="pairs"></div>
+  </section>
+
+  <section id="design">
+    <h2>Design your app to be remote-friendly</h2>
+    <div class="grid" id="design-grid"></div>
+  </section>
+
+  <section id="checklist">
+    <h2>Checklist</h2>
+    <p>Ticks are saved in this browser. Use it as a review before you publish and before you share.</p>
+    <div class="prog" id="prog" aria-live="polite"></div>
+    <div id="checks"></div>
+    <button class="ghost" id="reset-checks" type="button">Clear all ticks</button>
+  </section>
+
+  <section id="pitfalls">
+    <h2>Pitfalls, with live tests</h2>
+    <p>Open one to see what you would see, why it happens, and the fix. The button runs its real tests against the real bridge code.</p>
+    <div id="pit-list"></div>
+  </section>
+
+  <section id="status">
+    <h2>What has been tested, and what has not</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Area</th><th>Status</th><th>How</th></tr>
+      <tr><td>The bridge's behaviour</td><td>Tested</td><td><span id="count-tests">45</span> automated tests, including negative tests, against a stand-in database. 19 deliberate bugs were all caught by a test.</td></tr>
+      <tr><td>Real database, one person</td><td>Tested</td><td>Ping, hello, reading typed-but-unsubmitted text, disabled click, bad selector, invalid command, wait timeout, expired command, select and check, screenshot.</td></tr>
+      <tr><td>Private per-person channel</td><td>Tested</td><td>The <code>me</code> path resolved to the owner's id and the lease worked on the real database. Another person's access has not been tried.</td></tr>
+      <tr><td>Closed page reopened by Claude</td><td>Works, slowly</td><td>The first open request did nothing for about 100 seconds. After showing the artifact pane and opening again, the page loaded in about 25 seconds and ran the waiting command. Keep "open it yourself" as the fallback.</td></tr>
+      <tr><td>Opening another artifact</td><td>Tested</td><td>The page stayed loaded and visible.</td></tr>
+      <tr><td>Two different people at once</td><td>Not tested</td><td>Follows from the private-channel design. Try it with a second person.</td></tr>
+      <tr><td>Framework-controlled inputs (React and similar)</td><td>Not tested</td><td>The bridge uses the browser's native setter, which is the standard approach. Test it on your own page.</td></tr>
+      <tr><td>Very large apps and long pages</td><td>Not tested</td><td>Reads are capped. Use selectors to read less.</td></tr>
+    </table></div>
+  </section>
+</main>
+
+<script>/*__BRIDGE__*/</script>
+<script>/*__FAKEDB__*/</script>
+<script>/*__DEMO_JS__*/</script>
+<script>const DEMO_APP_HTML = /*__DEMO_HTML_JSON__*/"";</script>
+<script>/*__TESTS__*/</script>
+<script>/*__PITFALLS__*/</script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} } };
+{ const t = store.get("rc2-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; }
+$("theme").addEventListener("click", () => {
+  const r = document.documentElement, dark = getComputedStyle(r).colorScheme.includes("dark") || r.dataset.theme === "dark";
+  r.dataset.theme = (r.dataset.theme === "dark" || (dark && r.dataset.theme !== "light")) ? "light" : "dark"; store.set("rc2-theme", r.dataset.theme);
+});
+$("count-tests").textContent = TESTS.length;
+
+const RULES = [
+  ["Look before you act", "Send read first. It returns the controls, their selectors and what is typed in them. Never guess a selector."],
+  ["Wait for the finish, not the start", "Wait on something that appears only when the work is done. A missed wait should fail the command, not shrug."],
+  ["Fail loudly", "A step that cannot do what was asked reports why. A silent success that changed nothing is the worst result."],
+  ["Check before you run", "Validate the whole command first. Half-run commands leave an app in a state nobody chose."],
+  ["Never retry blindly", "The bridge never re-runs a command. Read the page, then decide. Make your own named actions safe to repeat."],
+  ["Keep it private", "Use the private per-person channel. Nothing that matters belongs in a path other people can read."],
+  ["Exact data from text, layout from pictures", "Screenshots are redrawn from the page and can differ. Use read or text for values you will rely on."],
+  ["The person stays in charge", "Show what ran, offer Pause, never click the connector's Allow for them, and stop when the page closes."],
+];
+RULES.forEach((r, i) => { const d = document.createElement("div"); d.className = "card"; d.innerHTML = '<h3><span class="n">' + (i + 1) + "</span>" + esc(r[0]) + "</h3><p>" + esc(r[1]) + "</p>"; $("rules-grid").appendChild(d); });
+
+const PAIRS = [
+  { no: "Use text to see what a form contains", noCode: '{ "action": "text", "selector": "#form" }', yes: "Use read, which includes typed values", yesCode: '{ "action": "read", "selector": "#form" }', why: "innerText returns words on screen. What a person types lives in the field's value." },
+  { no: "Pause for a fixed time and hope", noCode: '{ "action": "wait", "ms": 5000 }', yes: "Wait for the end signal", yesCode: '{ "action": "wait_for", "selector": "#results", "timeoutMs": 30000 }', why: "A fixed pause is too short on a bad day and wasteful on a good one." },
+  { no: "Wait on a container that appears at the start", noCode: '{ "action": "wait_for", "selector": "#out-panel" }', yes: "Wait on the finished result", yesCode: '{ "action": "wait_for", "selector": "#results-table" }', why: "The first version waited on the frame and took a screenshot of 'Running...'." },
+  { no: "Send one 40-step command and hope", noCode: '40 steps, no reads in between', yes: "Small commands that end with a read", yesCode: 'fill, click, wait_for, read', why: "A small command fails in one clear place and leaves less to undo." },
+  { no: "Reuse a command id", noCode: '"doc_id": "c001"  (again)', yes: "A new, sortable id each time", yesCode: '"doc_id": "c002"', why: "Existing ids cannot be overwritten without pinning their version, and ids are processed in order." },
+  { no: "Retry as soon as something fails", noCode: 'same command, again', yes: "Read the page, then decide", yesCode: '{ "action": "read" }', why: "A failed or interrupted command may have partly run. Repeating it can double the effect." },
+  { no: "Use force:true as a habit", noCode: '{ "action": "click", "selector": "#x", "force": true }', yes: "Fix why it is hidden, or force only on purpose", yesCode: '{ "action": "wait_for", "selector": "#x" }', why: "A person cannot click what they cannot see. force exists for the rare deliberate case." },
+  { no: "Store results where everyone can read them", noCode: 'results/c001', yes: "Use the private per-person path", yesCode: 'data/users/me/rc/res/c001', why: "The private path is hidden even from the owner. Shared paths are readable by everyone the app is shared with." },
+  { no: "Run a timer that writes a heartbeat", noCode: 'setInterval(() => db.doc(...).set(...), 5000)', yes: "Ping when you need to know", yesCode: '{ "action": "ping" }', why: "Timer writes clutter the database. The only timer write is the lease renewal while a command runs." },
+  { no: "Add an action that runs arbitrary code", noCode: '{ "action": "eval", "code": "..." }', yes: "Register small named actions", yesCode: '{ "action": "call", "name": "addItem", "args": {...} }', why: "Whatever you add is something a command can trigger. Keep the list short and boring." },
+  { no: "Read a whole big page every time", noCode: '{ "action": "read" }  (on a huge page)', yes: "Read with a selector", yesCode: '{ "action": "read", "selector": "#results" }', why: "Results are capped, and anything over the cap is dropped with an error." },
+  { no: "Assume the page is open", noCode: 'send, then wait forever', yes: "Ping first, with a fallback", yesCode: 'ping, then open the app, then ask the person', why: "A closed page cannot answer. Commands wait, and reopening can take over a minute." },
+  { no: "Republish in the middle of a command", noCode: 'publish while a command runs', yes: "Wait until it finishes", yesCode: 'status: done', why: "A republish reloads open pages. A running command is then marked interrupted." },
+  { no: "Write a repeatable action that adds", noCode: 'items.push(text)', yes: "Carry an id and ignore a repeat", yesCode: 'if (processed.has(requestId)) return', why: "Claude, or a person, may send the same request twice." },
+  { no: "Select by position in the markup", noCode: '"div > div:nth-child(3) > button"', yes: "Ids or data-rc attributes", yesCode: '"#save"  or  "[data-rc=save]"', why: "Positions break when the layout changes. read reports the best selector for every control." },
+  { no: "Ignore warning and accepted in results", noCode: 'status: "done"  (and move on)', yes: "Check them", yesCode: '"accepted": false  →  the field changed the value', why: "A step can succeed and still tell you something important." },
+  { no: "Treat status done as the goal reached", noCode: 'status: "done"', yes: "Verify with a read", yesCode: '{ "action": "read", "selector": "#list" }', why: "Done means every step ran. It does not mean the app ended up in the state you wanted." },
+  { no: "Put secrets in commands", noCode: '"value": "my-password"', yes: "Keep secrets out of the database", yesCode: 'let the person type them', why: "Commands and results are stored documents." },
+  { no: "Leave test data around", noCode: 'hundreds of old cmd/res/snap', yes: "Clean up now and then", yesCode: 'delete old documents', why: "An app holds at most 25,000 documents in total, shared by everyone." },
+];
+PAIRS.forEach((p) => {
+  const d = document.createElement("div"); d.className = "pair";
+  d.innerHTML = '<div class="no"><span class="tag">Don\'t</span><p>' + esc(p.no) + "</p><pre>" + esc(p.noCode) + '</pre></div><div class="yes"><span class="tag">Do</span><p>' + esc(p.yes) + "</p><pre>" + esc(p.yesCode) + '</pre></div><div class="why">' + esc(p.why) + "</div>";
+  $("pairs").appendChild(d);
+});
+
+const DESIGN = [
+  ["Ids on everything Claude may touch", "Stable ids (or data-rc) give stable selectors. Wrap the app in an element with id app so read has a clear scope."],
+  ["Use the hidden attribute", "It says clearly what is not shown. Visibility is checked for real, so CSS hiding also works, but hidden is easy to read."],
+  ["Show a finished signal", "A results table, a Saved message or a spinner that goes away. Without one, a wait has nothing to wait for."],
+  ["Disable, do not just hide, unavailable buttons", "A disabled button tells a command why it cannot proceed. The bridge reports it."],
+  ["Keep text and values honest", "What is in a field is the field's value. What is in a list is its items. Both are read, so keep them consistent with what you show."],
+  ["Name the awkward things", "For anything hard to click, register a named action. Keep each small, safe to repeat, and returning small JSON."],
+  ["Keep results small", "Show less per page, or give a selector for the part that matters. A document holds at most 256 KB."],
+  ["Plan for a reload", "A republish or a reopened page starts fresh. Do not rely on state that only lives in the page."],
+];
+DESIGN.forEach((r) => { const d = document.createElement("div"); d.className = "card"; d.innerHTML = "<h3>" + esc(r[0]) + "</h3><p>" + esc(r[1]) + "</p>"; $("design-grid").appendChild(d); });
+
+const CHECKS = [
+  ["Before you publish", ["Every control Claude should use has an id.", "The app is wrapped in an element with id app.", "Hidden things use the hidden attribute.", "Slow actions show a clear finished element.", "The panel, bridge and wiring are pasted in that order, and REMOTE_ACTIONS comes before the wiring.", "Named actions are safe to run twice, validate their args and return small JSON.", "No secrets are typed into commands or kept in the database.", "Publish settings: db with the two rules, user, and mcp only if you call a connector."]],
+  ["First run", ["The panel says on.", "ping answers and visibility is visible.", "read returns your controls with the right selectors and values.", "A fill then read-back shows accepted true.", "A click on a disabled control fails with a clear message.", "A command with a typo comes back invalid and nothing in it runs.", "A wait_for on something that never appears fails the command.", "A screenshot arrives and you looked at it.", "If a connector is involved, the Allow prompt appeared and you clicked it."]],
+  ["Before you rely on it", ["You closed the page, sent a command, and saw it wait as pending.", "You know what interrupted means and you read the page before resending.", "You use read or text for exact values.", "Commands that must not run late have expires.", "Someone knows how to delete old cmd, res and snap documents.", "You ran the stress tests, and added one for anything you changed in the bridge."]],
+  ["Before you share", ["Everyone who needs remote control has Contributor access or higher.", "Each person knows to connect their own connector and click their own Allow.", "People know their channel is private, including from the owner.", "You told people the app holds at most 25,000 documents, shared by everyone."]],
+];
+const done = new Set((store.get("rc2-bp-checks") || "").split(",").filter(Boolean));
+let totalChecks = 0;
+CHECKS.forEach(([title, items], gi) => {
+  const g = document.createElement("div"); g.className = "check-group"; g.innerHTML = "<h3>" + esc(title) + "</h3>";
+  items.forEach((t, i) => {
+    const id = gi + "-" + i; totalChecks++;
+    const l = document.createElement("label"); l.innerHTML = '<input type="checkbox" data-k="' + id + '"' + (done.has(id) ? " checked" : "") + "><span>" + esc(t) + "</span>";
+    l.querySelector("input").addEventListener("change", (e) => { e.target.checked ? done.add(id) : done.delete(id); store.set("rc2-bp-checks", [...done].join(",")); progress(); });
+    g.appendChild(l);
+  });
+  $("checks").appendChild(g);
+});
+function progress() { $("prog").textContent = done.size + " of " + totalChecks + " ticked"; }
+progress();
+$("reset-checks").addEventListener("click", () => { done.clear(); store.set("rc2-bp-checks", ""); document.querySelectorAll("#checks input").forEach((i) => (i.checked = false)); progress(); });
+
+PITFALLS.forEach((p, i) => {
+  const d = document.createElement("details"); d.className = "pit";
+  d.innerHTML = '<summary><span class="pn">' + (i + 1) + "</span><span>" + esc(p.t) + '</span></summary><div class="body"><span class="lbl">What you see</span><p>' + esc(p.sym) + '</p><span class="lbl">Why it happens</span><p>' + esc(p.why) + '</p><span class="lbl">The fix</span><p>' + esc(p.fix) + "</p></div>";
+  const body = d.querySelector(".body");
+  if (p.tests.length) {
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "btn"; btn.textContent = "Run its " + (p.tests.length === 1 ? "test" : p.tests.length + " tests");
+    const res = document.createElement("div"); res.className = "tres"; res.setAttribute("aria-live", "polite");
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; res.textContent = "Running...";
+      const s = await runStressTests(null, p.tests);
+      res.innerHTML = s.results.map((r) => '<span class="t ' + (r.passed ? "ok" : "bad") + '" title="' + esc(r.error || r.why) + '">' + (r.passed ? "PASS " : "FAIL ") + esc(r.name) + "</span>").join("");
+      btn.disabled = false;
+    });
+    body.append(btn, res);
+  } else { const n = document.createElement("p"); n.className = "empty"; n.textContent = "No automatic test for this one. It is checked by design or on a real app."; body.appendChild(n); }
+  $("pit-list").appendChild(d);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+/* structure every style keeps: the body collapses, the log scrolls inside its own box, the header mirror of the agent line is hidden unless a style shows it */
+#rc * { box-sizing: border-box; }
+#rc[data-collapsed="true"] .rc-body { display: none; }
+#rc .rc-mini { display: none; }
+#rc .rc-log { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+#rc .rc-log:empty::before { content: "No activity yet"; display: block; padding: 8px 10px; opacity: .55; }
+#rc .rc-detail:empty { display: none; }
+/* hairline: black on white, hairline rules, monospace labels. Inspired by the Vercel Geist look. Follows your page's colour tokens (--bg --panel --fg --muted --line --ok --warn --err), so it works in light and dark. This is the default. */
+#rc { --k-bg: var(--panel, #fff); --k-fg: var(--fg, #171717); --k-mu: var(--muted, #666); --k-ln: var(--line, #eaeaea); --k-ok: var(--ok, #0a7d3e); --k-wr: var(--warn, #a35200); --k-er: var(--err, #c4182d);
+  margin-top: 28px; background: var(--k-bg); color: var(--k-fg); border: 1px solid var(--k-ln); border-radius: 6px; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+#rc .rc-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--k-ln); }
+#rc .rc-head h2 { margin: 0; font: 600 13px/1 system-ui, sans-serif; flex: 1; }
+#rc .rc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--k-er); }
+#rc[data-s="on"] .rc-dot { background: var(--k-ok); } #rc[data-s="running"] .rc-dot, #rc[data-s="paused"] .rc-dot { background: var(--k-wr); }
+#rc .rc-pill { font: 12px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--k-mu); }
+#rc .rc-toggle { border: 1px solid var(--k-ln); background: transparent; color: var(--k-mu); border-radius: 5px; width: 24px; height: 24px; cursor: pointer; font-size: 11px; }
+#rc[data-collapsed="true"] .rc-toggle { transform: rotate(-90deg); } #rc[data-collapsed="true"] .rc-head { border-bottom: 0; }
+#rc .rc-body { padding: 0; }
+#rc .rc-grid { display: grid; grid-template-columns: 110px 1fr; }
+#rc .rc-grid > div { padding: 8px 14px; border-bottom: 1px solid var(--k-ln); }
+#rc .rc-k { font: 11px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--k-mu); text-transform: uppercase; letter-spacing: .06em; }
+#rc #rc-lock { font-weight: 600; } #rc #rc-lock[data-s="busy"], #rc #rc-lock[data-s="held"] { color: var(--k-wr); }
+#rc .rc-pause { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+#rc .rc-detail { padding: 8px 14px; border-bottom: 1px solid var(--k-ln); color: var(--k-mu); font: 12px ui-monospace, Menlo, Consolas, monospace; }
+#rc .rc-log { max-height: 160px; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+#rc .rc-log li { display: grid; grid-template-columns: 84px 1fr; gap: 10px; padding: 4px 14px; border-bottom: 1px solid var(--k-ln); }
+#rc .rc-log time { color: var(--k-mu); } #rc .rc-log li[data-k="warn"] span { color: var(--k-wr); } #rc .rc-log li[data-k="bad"] span { color: var(--k-er); } #rc .rc-log li[data-k="ok"] span { color: var(--k-ok); }
+#rc .rc-note { padding: 8px 14px; color: var(--k-mu); font-size: 12px; }
+#rc .rc-sub { padding: 8px 14px 4px; font: 11px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--k-mu); text-transform: uppercase; letter-spacing: .06em; }

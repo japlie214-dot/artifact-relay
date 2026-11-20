@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Remote Control Template</title>
+<style>
+  /* Layout: your app on top (#app), the remote-control panel underneath (#rc).
+     Replace the demo task list. Keep the #rc panel, the bridge and the wiring. */
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --fg: #1b2230; --muted: #5d6679; --line: #d7dce5;
+    --accent: #1f5fbf; --accent-fg: #ffffff; --chip: #eceff4; --ok: #1d6036; --warn: #9a5b00; --err: #8a1c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+      --accent: #7ab2ff; --accent-fg: #0d1a33; --chip: #262d3a; --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --panel: #1b2029; --fg: #e6e9f0; --muted: #9aa3b5; --line: #323a48;
+    --accent: #7ab2ff; --accent-fg: #0d1a33; --chip: #262d3a; --ok: #9fe3b8; --warn: #f5c26b; --err: #ffb4b4;
+    color-scheme: dark;
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding-block: 20px; display: grid; gap: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+  .field { margin-bottom: 10px; display: grid; gap: 4px; }
+  label { font-weight: 600; font-size: 13px; }
+  input[type=text], textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+  select { width: auto; }
+  button { background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 6px; padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .chk { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
+  ul { margin: 0 0 10px; padding-left: 20px; min-height: 22px; }
+  li { margin: 4px 0; }
+  .muted, small { color: var(--muted); font-size: 12px; }
+  [hidden] { display: none !important; }
+
+/* structure every style keeps: the body collapses, the log scrolls inside its own box, the header mirror of the agent line is hidden unless a style shows it */
+#rc * { box-sizing: border-box; }
+#rc[data-collapsed="true"] .rc-body { display: none; }
+#rc .rc-mini { display: none; }
+#rc .rc-log { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+#rc .rc-log:empty::before { content: "No activity yet"; display: block; padding: 8px 10px; opacity: .55; }
+#rc .rc-detail:empty { display: none; }
+/* hairline: black on white, hairline rules, monospace labels. Inspired by the Vercel Geist look. Follows your page's colour tokens (--bg --panel --fg --muted --line --ok --warn --err), so it works in light and dark. This is the default. */
+#rc { --k-bg: var(--panel, #fff); --k-fg: var(--fg, #171717); --k-mu: var(--muted, #666); --k-ln: var(--line, #eaeaea); --k-ok: var(--ok, #0a7d3e); --k-wr: var(--warn, #a35200); --k-er: var(--err, #c4182d);
+  margin-top: 28px; background: var(--k-bg); color: var(--k-fg); border: 1px solid var(--k-ln); border-radius: 6px; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+#rc .rc-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--k-ln); }
+#rc .rc-head h2 { margin: 0; font: 600 13px/1 system-ui, sans-serif; flex: 1; }
+#rc .rc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--k-er); }
+#rc[data-s="on"] .rc-dot { background: var(--k-ok); } #rc[data-s="running"] .rc-dot, #rc[data-s="paused"] .rc-dot { background: var(--k-wr); }
+#rc .rc-pill { font: 12px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--k-mu); }
+#rc .rc-toggle { border: 1px solid var(--k-ln); background: transparent; color: var(--k-mu); border-radius: 5px; width: 24px; height: 24px; cursor: pointer; font-size: 11px; }
+#rc[data-collapsed="true"] .rc-toggle { transform: rotate(-90deg); } #rc[data-collapsed="true"] .rc-head { border-bottom: 0; }
+#rc .rc-body { padding: 0; }
+#rc .rc-grid { display: grid; grid-template-columns: 110px 1fr; }
+#rc .rc-grid > div { padding: 8px 14px; border-bottom: 1px solid var(--k-ln); }
+#rc .rc-k { font: 11px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--k-mu); text-transform: uppercase; letter-spacing: .06em; }
+#rc #rc-lock { font-weight: 600; } #rc #rc-lock[data-s="busy"], #rc #rc-lock[data-s="held"] { color: var(--k-wr); }
+#rc .rc-pause { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+#rc .rc-detail { padding: 8px 14px; border-bottom: 1px solid var(--k-ln); color: var(--k-mu); font: 12px ui-monospace, Menlo, Consolas, monospace; }
+#rc .rc-log { max-height: 160px; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+#rc .rc-log li { display: grid; grid-template-columns: 84px 1fr; gap: 10px; padding: 4px 14px; border-bottom: 1px solid var(--k-ln); }
+#rc .rc-log time { color: var(--k-mu); } #rc .rc-log li[data-k="warn"] span { color: var(--k-wr); } #rc .rc-log li[data-k="bad"] span { color: var(--k-er); } #rc .rc-log li[data-k="ok"] span { color: var(--k-ok); }
+#rc .rc-note { padding: 8px 14px; color: var(--k-mu); font-size: 12px; }
+#rc .rc-sub { padding: 8px 14px 4px; font: 11px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--k-mu); text-transform: uppercase; letter-spacing: .06em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Remote Control Template</h1>
+    <p class="sub">A demo task list plus the remote-control bridge. Replace the demo with your app and keep the bridge.</p>
+  </header>
+
+  <!-- ===================== YOUR APP (replace this block) ===================== -->
+  <section class="panel" id="app">
+    <h2 class="demo-title">Task list</h2>
+    <div id="form">
+      <div class="field"><label for="item">Task</label><input id="item" type="text" placeholder="What needs doing?"></div>
+      <div class="field"><label for="note">Note</label><textarea id="note" rows="2" placeholder="Optional details"></textarea></div>
+      <div class="row">
+        <label for="category">Category</label>
+        <select id="category"><option>Home</option><option>Work</option><option>Errands</option></select>
+        <label class="chk"><input id="urgent" type="checkbox"> Urgent</label>
+        <button id="add" type="button">Add task</button>
+      </div>
+    </div>
+    <ul id="list"></ul>
+    <div class="row">
+      <button id="sync" type="button">Sync</button><span id="syncing" hidden>Syncing...</span><span id="synced" hidden>Synced ✓</span>
+      <button id="clear" type="button" disabled>Clear all</button>
+      <button id="toggle" type="button">Details</button>
+    </div>
+    <div id="details" hidden>Tasks are kept in memory only. Reload the page and they are gone.</div>
+    <p id="count" class="muted">0 tasks</p>
+  </section>
+  <!-- ========================================================================= -->
+
+  <section id="rc" aria-live="polite" data-s="off" data-collapsed="false">
+    <header class="rc-head">
+      <span class="rc-dot" aria-hidden="true"></span>
+      <h2>Claude remote control</h2>
+      <span id="rc-state" class="rc-pill" data-s="off">starting...</span>
+      <span id="rc-mini" class="rc-mini"></span>
+      <button id="rc-toggle" class="rc-toggle" type="button" aria-expanded="true" aria-label="Collapse or expand the panel">&#9662;</button>
+    </header>
+    <div class="rc-body">
+      <div class="rc-grid">
+        <div class="rc-k">Session</div><div><span id="rc-lock" data-s="free">free</span></div>
+        <div class="rc-k">Control</div><div><label class="rc-pause" for="rc-pause"><input id="rc-pause" type="checkbox"> <span>Pause (hold new commands)</span></label></div>
+      </div>
+      <div id="rc-detail" class="rc-detail"></div>
+      <div class="rc-sub">Logs</div>
+      <ol id="rc-log" class="rc-log" tabindex="0" aria-label="Recent activity"></ol>
+      <div class="rc-note">Private channel: only you, from your own Claude session, can drive this page. Results and screenshots stay in your private area.</div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+/* ===================== YOUR APP LOGIC (replace this block) ===================== */
+/* The demo app: a small task list. It is deliberately full of the things real apps have:
+   typed-but-unsubmitted fields, a multi-line note, a dropdown, a checkbox, a button that starts disabled,
+   a hidden panel, repeated buttons (one Remove per task) and slow work (Sync). */
+function mountDemoApp(root, o) {
+  o = Object.assign({ syncMs: 1800 }, o);
+  const q = (s) => root.querySelector(s);
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const tasks = [];
+  function render() {
+    q("#list").innerHTML = tasks.map((t, i) =>
+      "<li><span>" + esc(t.text) + "</span> <small>[" + esc(t.category) + (t.urgent ? ", urgent" : "") + "]</small>" +
+      (t.note ? "<br><small>" + esc(t.note) + "</small>" : "") +
+      ' <button class="remove" type="button" data-i="' + i + '">Remove</button></li>').join("");
+    q("#count").textContent = tasks.length + " task" + (tasks.length === 1 ? "" : "s");
+    q("#clear").disabled = !tasks.length;
+  }
+  function add(t) {
+    const text = String(t.text || "").trim();
+    if (!text) return false;
+    tasks.push({ text, note: String(t.note || "").trim(), category: t.category || "Home", urgent: !!t.urgent });
+    render(); return true;
+  }
+  q("#add").addEventListener("click", () => {
+    if (add({ text: q("#item").value, note: q("#note").value, category: q("#category").value, urgent: q("#urgent").checked })) {
+      q("#item").value = ""; q("#note").value = ""; q("#urgent").checked = false;
+    }
+  });
+  q("#item").addEventListener("keydown", (e) => { if (e.key === "Enter") q("#add").click(); });
+  q("#list").addEventListener("click", (e) => { const b = e.target.closest(".remove"); if (b) { tasks.splice(+b.dataset.i, 1); render(); } });
+  q("#clear").addEventListener("click", () => { tasks.length = 0; render(); });
+  q("#toggle").addEventListener("click", () => { q("#details").hidden = !q("#details").hidden; });
+  q("#sync").addEventListener("click", () => {
+    const b = q("#sync"); b.disabled = true; q("#synced").hidden = true; q("#syncing").hidden = false;
+    setTimeout(() => { q("#syncing").hidden = true; q("#synced").hidden = false; b.disabled = false; }, o.syncMs);
+  });
+  render();
+  return {
+    tasks,
+    actions: {
+      addTask: async (a) => ({ added: add(a || {}), total: tasks.length }),
+      getState: async () => ({ tasks: JSON.parse(JSON.stringify(tasks)) }),
+    },
+  };
+}
+
+const demo = mountDemoApp(document.getElementById("app"));
+// Named actions Claude can run with {"action":"call","name":"addTask","args":{...}}.
+// Use them for things that are awkward to click. Return small, JSON-serializable data. Make them safe to run twice.
+window.REMOTE_ACTIONS = demo.actions;
+/* ================================================================================ */
+
+/* ===================== REMOTE CONTROL BRIDGE v2 (keep) =====================
+   A per-user, private command channel stored in the app's shared db.
+   Paths (relative to `base`, for example "data/users/<your id>/rc"):
+     <base>/cmd/<id>      Claude writes  {status:"pending", steps:[...], expires?:epochMs}
+     <base>/res/<id>      page writes    {status, error, results:[...], t}
+     <base>/snap/<id>     page writes    {jpeg:"data:image/...", t}
+     <base>/meta/hello    page writes    {openedAt, holder, version, visibility}
+     <base>/meta/lock     page writes    {agent, state, since, lastActive, expiresAt}  (who is using the app; frees itself after lockIdleMs of inactivity)
+   A command may carry  agent:"name"  (a label), session:"<session id>" (stamped by the plugin hook, not by the model), sessionTitle, subagent:{id,type},
+   release:true (free the app when done), takeover:true (take it from another session). The lock is keyed on the session when there is one, else on the agent name.
+   If another agent holds the app, the command is not run and ends with status "busy". ping-only commands never take the lock.
+   Steps are plain data from a fixed action list. Nothing is eval'd.
+   Failure policy:
+     hard error  -> the command stops, status "error"      (missing element, disabled, timeout...)
+     soft failure -> the step reports ok:false and continues (screenshot unavailable)
+     warning     -> ok:true plus a "warning" field         (selector matched several elements)      */
+const BRIDGE_VERSION = "2.2";
+const BRIDGE_ACTIONS = ["ping", "inspect", "read", "fill", "click", "check", "select", "press", "wait", "wait_for", "text", "call", "screenshot"];
+
+function createBridge(opts) {
+  const o = Object.assign({
+    root: document, actions: {}, snapshot: null, stepDelayMs: 0,
+    onState() {}, onLog() {}, onLock() {}, highlight() {}, now: () => Date.now(),
+    holder: "tab-" + Math.random().toString(36).slice(2, 8),
+  }, opts);
+  const L = Object.assign({
+    maxSteps: 40, maxChars: 20000, maxResultBytes: 200000, maxSnapChars: 190000, maxSnaps: 10,
+    stepTimeoutMs: 150000, leaseMs: 60000, rescanMs: 5000, maxFieldChars: 2000, maxElements: 150, maxRows: 100, lockIdleMs: 120000, maxAgentChars: 60, requireAgent: false,
+  }, opts.limits || {});
+  const { db, base, root } = o;
+  const P = { cmd: base + "/cmd", res: base + "/res", snap: base + "/snap", hello: base + "/meta/hello", lock: base + "/meta/lock" };
+  const S = { who: {}, paused: false, stopped: false, snapIds: [], unsub: null, chain: Promise.resolve(), seen: new Set(), running: new Set() };
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const msg = (e) => String((e && e.message) || (e && e.code) || e);
+  const trunc = (s, n) => { s = String(s == null ? "" : s); return s.length > n ? { text: s.slice(0, n), truncated: true, length: s.length } : { text: s, truncated: false, length: s.length }; };
+  const doc = () => root.ownerDocument || root;
+  const win = () => doc().defaultView || window;
+  const visState = () => doc().visibilityState;
+  const withTimeout = (p, ms, label) => new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error(label + " timed out after " + ms + "ms")), ms);
+    p.then((v) => { clearTimeout(t); res(v); }, (e) => { clearTimeout(t); rej(e); });
+  });
+
+  /* ---------- who is using the app ---------- */
+  const agentOf = (d) => (typeof d.agent === "string" && d.agent.trim() ? d.agent.trim() : "unnamed");
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
+  const shortId = (s) => String(s).replace(/[^A-Za-z0-9]/g, "").slice(0, 8);
+  // who is calling: the session id (stamped by the hook) is the identity; the title and agent name are only for display
+  function whoOf(d) {
+    const sid = str(d.session), sub = d.subagent && typeof d.subagent === "object" ? str(d.subagent.id) : "";
+    const name = str(d.sessionTitle) || str(d.agent) || (d.subagent && str(d.subagent.type)) || "";
+    const key = sid ? "s:" + sid + (sub ? "/" + sub : "") : "a:" + agentOf(d);
+    const tag = sid ? shortId(sid) + (sub ? "/" + shortId(sub) : "") : "";
+    const label = name ? (tag ? name + " \u00b7 " + tag : name) : (tag || "unnamed");
+    return { key, label, verified: !!sid };
+  }
+  const logTag = (id) => (S.who[id] ? S.who[id] + "  " : "");
+  const sameWho = (l, w) => (l.key ? l.key === w.key : l.agent === w.label);
+  async function readLock() { try { const s = await db.doc(P.lock).get(); return s.exists ? s.data() : null; } catch (_) { return null; } }
+  const lockLive = (l) => !!(l && l.agent && Number(l.expiresAt) > o.now());
+  function lockInfo(l) {
+    if (!lockLive(l)) return { held: false };
+    return { held: true, agent: l.agent, state: l.state, since: l.since, idleMs: Math.max(0, o.now() - l.lastActive), expiresInMs: Math.max(0, l.expiresAt - o.now()) };
+  }
+  async function writeLock(l) { try { await db.doc(P.lock).set(l); } catch (e) { o.onLog("could not write the lock: " + msg(e)); } o.onLock(l); }
+  const touchedLock = (prev, w, cmd, state) => ({ agent: w.label, key: w.key, verified: w.verified, cmd, state, holder: o.holder, since: prev && lockLive(prev) && sameWho(prev, w) ? prev.since : o.now(), lastActive: o.now(), expiresAt: o.now() + L.lockIdleMs });
+
+  /* ---------- looking at the page ---------- */
+  function visible(el) {
+    if (!el || el.hidden || (el.closest && el.closest("[hidden]"))) return false;
+    if (el.getClientRects && el.getClientRects().length === 0) return false;
+    const cs = win().getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none";
+  }
+  const isDisabled = (el) => !!(el.disabled || el.getAttribute("aria-disabled") === "true");
+  function labelOf(el) {
+    const aria = el.getAttribute("aria-label"); if (aria) return aria.trim().slice(0, 80);
+    if (el.labels && el.labels.length) return el.labels[0].innerText.trim().slice(0, 80);
+    if (el.placeholder) return el.placeholder.slice(0, 80);
+    if (el.tagName === "INPUT" && /^(button|submit|reset)$/.test(el.type)) return String(el.value).slice(0, 80);
+    return (el.innerText || el.title || "").trim().replace(/\s+/g, " ").slice(0, 80);
+  }
+  function bestSelector(el) {
+    const esc = (s) => (win().CSS && win().CSS.escape ? win().CSS.escape(s) : String(s).replace(/[^\w-]/g, "\\$&"));
+    if (el.id) return "#" + esc(el.id);
+    const rc = el.getAttribute("data-rc"); if (rc) return '[data-rc="' + rc.replace(/"/g, '\\"') + '"]';
+    const nm = el.getAttribute("name"); if (nm) return el.tagName.toLowerCase() + '[name="' + nm.replace(/"/g, '\\"') + '"]';
+    const parts = []; let n = el;
+    while (n && n.nodeType === 1 && n !== root && parts.length < 4) {
+      if (n.id) { parts.unshift("#" + esc(n.id)); break; }
+      let part = n.tagName.toLowerCase();
+      const sib = n.parentElement ? [...n.parentElement.children].filter((c) => c.tagName === n.tagName) : [];
+      if (sib.length > 1) part += ":nth-of-type(" + (sib.indexOf(n) + 1) + ")";
+      parts.unshift(part); n = n.parentElement;
+    }
+    return parts.join(" > ");
+  }
+  function describe(el) {
+    const tag = el.tagName.toLowerCase(), type = tag === "input" ? (el.type || "text").toLowerCase() : undefined;
+    const d = { selector: bestSelector(el), tag };
+    if (type) d.type = type;
+    if (el.id) d.id = el.id;
+    const nm = el.getAttribute("name"); if (nm) d.name = nm;
+    d.label = labelOf(el);
+    if (tag === "input" || tag === "textarea" || tag === "select") {
+      if (type === "password") d.value = el.value ? "(hidden: password)" : "";
+      else if (type === "checkbox" || type === "radio") d.checked = !!el.checked;
+      else if (tag === "select") { d.value = el.value; d.selectedText = el.selectedOptions[0] ? el.selectedOptions[0].text : ""; d.options = [...el.options].slice(0, 50).map((op) => op.text); }
+      else { const t = trunc(el.value, L.maxFieldChars); d.value = t.text; if (t.truncated) d.valueLength = t.length; }
+    } else if (el.isContentEditable) { const t = trunc(el.innerText, L.maxFieldChars); d.value = t.text; }
+    if (tag === "a") d.href = el.getAttribute("href");
+    d.disabled = isDisabled(el);
+    d.visible = visible(el);
+    return d;
+  }
+  const CONTROLS = 'button,input,textarea,select,a[href],[role="button"],[contenteditable=""],[contenteditable="true"],[data-rc]';
+  function controlsOf(scope) {
+    const all = [...scope.querySelectorAll(CONTROLS)];
+    return { controls: all.slice(0, L.maxElements).map(describe), controlsTotal: all.length, controlsTruncated: all.length > L.maxElements };
+  }
+  const defaultScope = () => root.querySelector("#app") || root.body || root;
+  function readScope(scope) {
+    const t = trunc(scope.innerText != null ? scope.innerText : scope.textContent, L.maxChars);
+    const lists = [...scope.querySelectorAll("ul,ol")].filter(visible).slice(0, 20).map((ul) => ({
+      selector: bestSelector(ul),
+      items: [...ul.children].filter((li) => li.tagName === "LI" && visible(li)).slice(0, L.maxRows).map((li) => trunc(li.innerText.trim().replace(/\s+/g, " "), 300).text),
+    }));
+    const tables = [...scope.querySelectorAll("table")].filter(visible).slice(0, 10).map((tb) => ({
+      selector: bestSelector(tb),
+      rows: [...tb.rows].slice(0, L.maxRows).map((r) => [...r.cells].slice(0, 30).map((c) => trunc(c.innerText.trim(), 200).text)),
+    }));
+    return Object.assign({ title: doc().title || "", text: t.text, textTruncated: t.truncated, lists, tables }, controlsOf(scope));
+  }
+
+  /* ---------- finding and acting ---------- */
+  function one(step, o2) {
+    if (typeof step.selector !== "string" || !step.selector) throw new Error('"selector" is required for ' + step.action);
+    let list; try { list = [...root.querySelectorAll(step.selector)]; } catch (_) { throw new Error("Invalid selector: " + step.selector); }
+    if (!list.length) throw new Error("No element matches " + step.selector);
+    let i = 0;
+    if (step.index !== undefined) { i = Number(step.index); if (!Number.isInteger(i) || i < 0 || i >= list.length) throw new Error("index " + step.index + " is out of range (" + list.length + " matches)"); }
+    const el = list[i];
+    if (o2 && o2.needVisible && !step.force && !visible(el)) throw new Error("Element is not visible: " + step.selector + " (add force:true to act anyway)");
+    o.highlight(el);
+    const out = { el, matches: list.length };
+    if (list.length > 1 && step.index === undefined) out.warning = "Selector matched " + list.length + " elements; used the first. Add index or a more specific selector.";
+    return out;
+  }
+  function setNative(el, v) {
+    const W = win();
+    const proto = el.tagName === "TEXTAREA" ? W.HTMLTextAreaElement.prototype : el.tagName === "SELECT" ? W.HTMLSelectElement.prototype : W.HTMLInputElement.prototype;
+    const d = Object.getOwnPropertyDescriptor(proto, "value");
+    if (d && d.set) d.set.call(el, v); else el.value = v;      // the native setter makes React-style controlled inputs notice
+  }
+  function fire(el, type, init) {
+    const W = win(), E = type === "input" && W.InputEvent ? W.InputEvent : W.Event;
+    el.dispatchEvent(new E(type, Object.assign({ bubbles: true }, init)));
+  }
+  const withWarn = (r, w) => (w ? Object.assign(r, { warning: w }) : r);
+
+  async function runStep(step, ctx) {
+    switch (step.action) {
+      case "ping":
+        return { ok: true, pong: true, t: o.now(), visibility: visState(), version: BRIDGE_VERSION, holder: o.holder, lock: lockInfo(await readLock()) };
+
+      case "inspect": {
+        const f = step.selector ? one(step) : { el: defaultScope() };
+        return Object.assign({ ok: true }, controlsOf(f.el));
+      }
+      case "read": {
+        const f = step.selector ? one(step) : { el: defaultScope() };
+        return Object.assign({ ok: true }, readScope(f.el));
+      }
+      case "fill": {
+        const f = one(step, { needVisible: true }), el = f.el;
+        if (step.value === undefined) throw new Error('"value" is required for fill');
+        const v = String(step.value), type = (el.type || "").toLowerCase();
+        if (isDisabled(el)) throw new Error("Element is disabled: " + step.selector);
+        if (el.readOnly) throw new Error("Element is read-only: " + step.selector);
+        if (el.tagName === "SELECT") throw new Error('Use "select" for a dropdown');
+        if (el.tagName === "INPUT" && /^(checkbox|radio|button|submit|reset|file|image)$/.test(type)) throw new Error('fill cannot set an input of type "' + type + '". Use check or click.');
+        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") { el.focus(); setNative(el, v); }
+        else if (el.isContentEditable) { el.focus(); el.textContent = v; }
+        else throw new Error("Element is not a text field: " + step.selector);
+        fire(el, "input", { data: v, inputType: "insertText" }); fire(el, "change");
+        const actual = el.isContentEditable && el.tagName !== "INPUT" && el.tagName !== "TEXTAREA" ? el.innerText : el.value;
+        const accepted = actual === v, t = trunc(actual, 200);
+        return withWarn({ ok: true, matches: f.matches, accepted, value: t.text, valueLength: actual.length },
+          f.warning || (accepted ? null : "The field changed the value (length, type or pattern rules). Check value."));
+      }
+      case "click": {
+        const f = one(step, { needVisible: true });
+        if (isDisabled(f.el)) throw new Error("Element is disabled: " + step.selector);
+        f.el.click(); await sleep(30);
+        return withWarn({ ok: true, matches: f.matches }, f.warning);
+      }
+      case "check": {
+        const f = one(step, { needVisible: true }), el = f.el;
+        if (!(el.tagName === "INPUT" && /^(checkbox|radio)$/.test(el.type))) throw new Error("check needs a checkbox or radio button");
+        if (isDisabled(el)) throw new Error("Element is disabled: " + step.selector);
+        const want = step.checked === undefined ? true : !!step.checked;
+        if (el.checked !== want) { el.click(); await sleep(30); }
+        if (el.checked !== want) throw new Error("Could not set checked=" + want + " on " + step.selector);
+        return withWarn({ ok: true, checked: el.checked }, f.warning);
+      }
+      case "select": {
+        const f = one(step, { needVisible: true }), el = f.el;
+        if (el.tagName !== "SELECT") throw new Error("select needs a <select> element");
+        if (isDisabled(el)) throw new Error("Element is disabled: " + step.selector);
+        const by = step.value !== undefined ? (op) => op.value === String(step.value) : step.label !== undefined ? (op) => op.text.trim() === String(step.label).trim() : null;
+        if (!by) throw new Error('select needs "value" or "label"');
+        const op = [...el.options].find(by);
+        if (!op || op.disabled) throw new Error("No selectable option matches. Options: " + [...el.options].map((x) => JSON.stringify(x.text)).join(", "));
+        setNative(el, op.value); fire(el, "input"); fire(el, "change");
+        return withWarn({ ok: true, value: el.value, selectedText: el.selectedOptions[0].text }, f.warning);
+      }
+      case "press": {
+        if (typeof step.key !== "string" || !step.key) throw new Error('"key" is required for press');
+        let target;
+        if (step.selector) { target = one(step, { needVisible: true }).el; target.focus(); } else target = doc().activeElement || doc().body;
+        const init = { key: step.key, code: step.key.length === 1 ? "Key" + step.key.toUpperCase() : step.key, bubbles: true, cancelable: true };
+        target.dispatchEvent(new (win().KeyboardEvent)("keydown", init));
+        target.dispatchEvent(new (win().KeyboardEvent)("keyup", init));
+        await sleep(30);
+        return { ok: true, synthetic: true, note: "Synthetic key events run the page's handlers but not browser defaults such as submitting a form. Click the submit button instead." };
+      }
+      case "wait": {
+        const ms = Number(step.ms);
+        if (!Number.isFinite(ms) || ms < 0) throw new Error('"ms" must be a number');
+        await sleep(Math.min(ms, 10000)); return { ok: true, waitedMs: Math.min(ms, 10000) };
+      }
+      case "wait_for": {
+        if (typeof step.selector !== "string" || !step.selector) throw new Error('"selector" is required for wait_for');
+        const limit = Math.min(Number(step.timeoutMs) || 15000, 120000), t0 = o.now();
+        for (;;) {
+          let list; try { list = [...root.querySelectorAll(step.selector)]; } catch (_) { throw new Error("Invalid selector: " + step.selector); }
+          const vis = list.filter(visible);
+          const textOk = !step.textIncludes || vis.some((e) => String(e.innerText || "").includes(step.textIncludes) || String(e.value || "").includes(step.textIncludes));
+          if (step.gone ? vis.length === 0 : (vis.length > 0 && textOk)) return { ok: true, waitedMs: o.now() - t0 };
+          if (o.now() - t0 >= limit) throw new Error("Timed out after " + limit + "ms waiting for " + step.selector + (step.gone ? " to disappear" : " to appear") + (step.textIncludes ? ' with text "' + step.textIncludes + '"' : ""));
+          await sleep(100);
+        }
+      }
+      case "text": {
+        const f = one(step), el = f.el, isField = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+        const t = trunc(isField ? el.value : (el.innerText != null ? el.innerText : el.textContent), L.maxChars);
+        const r = { ok: true, matches: f.matches, text: t.text, truncated: t.truncated, length: t.length, visible: visible(el) };
+        if (isField) r.source = "value";
+        else {
+          const typed = [...el.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=password]),textarea')].filter((x) => x.value).length;
+          if (typed) r.note = typed + " field(s) inside have typed values that text does not include. Use read to see them.";
+          if (!r.visible) r.note = (r.note ? r.note + " " : "") + "The element is hidden, so its text may be empty.";
+        }
+        return withWarn(r, f.warning);
+      }
+      case "call": {
+        const fn = o.actions && o.actions[step.name];
+        if (typeof fn !== "function") throw new Error("No registered action: " + step.name + ". Registered: " + Object.keys(o.actions || {}).join(", "));
+        if (step.args !== undefined && (typeof step.args !== "object" || step.args === null || Array.isArray(step.args))) throw new Error('"args" must be an object');
+        const result = await fn(step.args || {}, { cmdId: ctx.cmdId });
+        let s; try { s = JSON.stringify(result === undefined ? null : result); } catch (e) { throw new Error("Action result is not JSON-serializable: " + msg(e)); }
+        if (s.length > L.maxChars) throw new Error("Action result is too large (" + s.length + " characters; the limit is " + L.maxChars + ")");
+        return { ok: true, name: step.name, result: JSON.parse(s) };
+      }
+      case "screenshot": {
+        if (typeof o.snapshot !== "function") return { ok: false, reason: "screenshots are not available in this page" };
+        const target = step.selector ? one(step).el : null;
+        let url; try { url = await o.snapshot(target); } catch (e) { return { ok: false, reason: "capture failed: " + msg(e) }; }
+        if (typeof url !== "string" || url.indexOf("data:") !== 0) return { ok: false, reason: "capture produced no image" };
+        if (url.length > L.maxSnapChars) return { ok: false, reason: "image too large (" + url.length + " characters; limit " + L.maxSnapChars + "). Try a selector for a smaller area." };
+        const id = ctx.cmdId + "_" + (ctx.n++);
+        await db.doc(P.snap + "/" + id).set({ jpeg: url, t: o.now() });
+        S.snapIds.push(id);
+        while (S.snapIds.length > L.maxSnaps) { try { await db.doc(P.snap + "/" + S.snapIds.shift()).delete(); } catch (_) {} }
+        return { ok: true, snap: id, bytes: url.length };
+      }
+      default: throw new Error('Unknown action "' + step.action + '"');
+    }
+  }
+
+  /* ---------- commands ---------- */
+  function validate(data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return "The command is not an object";
+    if (!Array.isArray(data.steps)) return '"steps" must be a list';
+    if (!data.steps.length) return '"steps" is empty';
+    if (data.steps.length > L.maxSteps) return "Too many steps (" + data.steps.length + "). The limit is " + L.maxSteps;
+    for (let i = 0; i < data.steps.length; i++) {
+      const s = data.steps[i];
+      if (!s || typeof s !== "object" || Array.isArray(s)) return "Step " + (i + 1) + " is not an object";
+      if (typeof s.action !== "string") return "Step " + (i + 1) + ' has no "action"';
+      if (BRIDGE_ACTIONS.indexOf(s.action) < 0) return "Step " + (i + 1) + ': unknown action "' + s.action + '". Known actions: ' + BRIDGE_ACTIONS.join(", ");
+    }
+    if (data.expires !== undefined && !Number.isFinite(Number(data.expires))) return '"expires" must be a number (epoch milliseconds)';
+    if (L.requireAgent && !(typeof data.agent === "string" && data.agent.trim()) && !(typeof data.session === "string" && data.session.trim())) return 'This app needs to know who you are. Put your session name in the "agent" field (the title of your Claude session), for example "agent":"Sales report helper". With the remote-control plugin installed, the session id is added for you.';
+    for (const k of ["session", "sessionTitle"]) if (data[k] !== undefined && (typeof data[k] !== "string" || data[k].length > 120)) return '"' + k + '" must be a short text';
+    if (data.subagent !== undefined && (!data.subagent || typeof data.subagent !== "object" || Array.isArray(data.subagent))) return '"subagent" must be an object like {"id":"...","type":"..."}';
+    if (data.agent !== undefined && (typeof data.agent !== "string" || data.agent.length > L.maxAgentChars)) return '"agent" must be a short text (at most ' + L.maxAgentChars + " characters)";
+    for (const k of ["release", "takeover"]) if (data[k] !== undefined && typeof data[k] !== "boolean") return '"' + k + '" must be true or false';
+    return null;
+  }
+
+  async function finish(id, ref, status, error, results, extra) {
+    const res = Object.assign({ status, error: error || null, results: results || [], t: o.now(), holder: o.holder }, extra || {});
+    const size = JSON.stringify(res).length;
+    if (size > L.maxResultBytes) {
+      res.results = res.results.map((r) => ({ step: r.step, action: r.action, ok: r.ok, error: r.error }));
+      res.error = (res.error ? res.error + " | " : "") + "The full results were too large (" + size + " bytes) and were dropped. Ask for less, for example read with a selector.";
+      if (res.status === "done") res.status = "error";
+    }
+    try { await db.doc(P.res + "/" + id).set(res); }
+    catch (e) { try { await db.doc(P.res + "/" + id).set({ status: "error", error: "Could not save the result: " + msg(e), results: [], t: o.now() }); } catch (_) {} }
+    try { await ref.update({ status: res.status }); } catch (_) {}
+    o.onLog(logTag(id) + id + " " + res.status + (res.error ? ": " + res.error : ""));
+  }
+
+  async function execute(snap) {
+    const id = snap.id;
+    if (S.seen.has(id)) return;
+    S.seen.add(id);
+    const ref = db.doc(P.cmd + "/" + id);
+    let data, who = null, held = false;
+    try {
+      const lease = await ref.acquire({ holder: o.holder, ttlMs: L.leaseMs });            // one tab at a time
+      if (!lease.acquired) { o.onLog(id + ": another tab is handling it"); return; }
+      const fresh = await ref.get();
+      if (!fresh.exists || (fresh.data() || {}).status !== "pending") return;
+      data = fresh.data();
+    } catch (e) {
+      o.onLog(id + ": could not claim it (" + msg(e) + "). Will look again soon.");
+      S.seen.delete(id); setTimeout(rescan, L.rescanMs); return;
+    }
+    S.running.add(id);
+    const renew = setInterval(() => { ref.acquire({ holder: o.holder, ttlMs: L.leaseMs }).catch(() => {}); }, Math.max(500, L.leaseMs / 2));
+    const renewLock = setInterval(() => { if (held) readLock().then((l) => { if (l && sameWho(l, who)) writeLock(touchedLock(l, who, id, "running")); }); }, Math.max(100, L.lockIdleMs / 3));
+    try {
+      const bad = validate(data);
+      if (bad) return await finish(id, ref, "invalid", bad, []);
+      if (data.expires !== undefined && o.now() > Number(data.expires)) return await finish(id, ref, "expired", "It expired before it ran", []);
+      while (S.paused && !S.stopped) await sleep(200);
+      if (S.stopped) return;
+      who = whoOf(data); S.who[id] = who.label;
+      if (!data.steps.every((s) => s.action === "ping")) {                 // ping-only commands just look; they never take the app
+        const prev = await readLock();
+        if (lockLive(prev) && !sameWho(prev, who) && !data.takeover) {
+          const li = lockInfo(prev);
+          return await finish(id, ref, "busy", 'The app is in use by session "' + prev.agent + '" (' + (prev.state === "running" ? "working now" : "idle for " + Math.round(li.idleMs / 1000) + "s") + "). It frees itself in " + Math.round(li.expiresInMs / 1000) + 's, or when that session sends release:true. Wait and send again, or use takeover:true only if the person says so. Nothing was run.', [], { lock: li });
+        }
+        if (lockLive(prev) && !sameWho(prev, who)) o.onLog(who.label + " took the app over from " + prev.agent);
+        await writeLock(touchedLock(prev, who, id, "running")); held = true;
+      }
+      await ref.update({ status: "running", startedAt: o.now(), holder: o.holder });
+      o.onState("running", id); o.onLog(logTag(id) + id + " started (" + data.steps.length + " steps)");
+      const results = [], ctx = { cmdId: id, n: 1 };
+      let status = "done", error = null;
+      for (let i = 0; i < data.steps.length; i++) {
+        while (S.paused && !S.stopped) await sleep(200);
+        if (S.stopped) { status = "interrupted"; error = "The bridge was stopped"; break; }
+        const s = data.steps[i];
+        if (o.stepDelayMs) await sleep(o.stepDelayMs);
+        const t0 = o.now();
+        try {
+          const r = await withTimeout(runStep(s, ctx), L.stepTimeoutMs, "Step " + (i + 1));
+          results.push(Object.assign({ step: i, action: s.action, ms: o.now() - t0 }, r));
+        } catch (e) {
+          results.push({ step: i, action: s.action, ok: false, error: msg(e), ms: o.now() - t0 });
+          if (s.optional) continue;
+          status = "error"; error = "Step " + (i + 1) + " (" + s.action + "): " + msg(e); break;
+        }
+      }
+      await finish(id, ref, status, error, results);
+    } catch (e) {
+      o.onLog(id + ": unexpected error " + msg(e));
+      await finish(id, ref, "error", "Unexpected error: " + msg(e), []);
+    } finally {
+      clearInterval(renew); clearInterval(renewLock); S.running.delete(id); setTimeout(() => { delete S.who[id]; }, 2000);
+      if (held) {                                               // the idle clock starts when the command ends
+        try {
+          if (data && data.release) { await db.doc(P.lock).delete(); o.onLock(null); o.onLog(who.label + " released the app"); }
+          else await writeLock(touchedLock(await readLock(), who, id, "idle"));
+        } catch (_) {}
+      }
+      o.onState(S.paused ? "paused" : "on", "waiting for commands");
+    }
+  }
+
+  /* ---------- lifecycle ---------- */
+  function enqueue(d) { S.chain = S.chain.then(() => execute(d)).catch((e) => o.onLog("bridge error: " + msg(e))); }
+  async function rescan() {
+    if (S.stopped) return;
+    try { const snap = await db.collection(P.cmd).where("status", "==", "pending").get(); snap.docs.forEach((d) => { if (!S.seen.has(d.id)) enqueue(d); }); }
+    catch (e) { o.onLog("rescan failed: " + msg(e)); }
+  }
+  async function recover() {                                  // commands left "running" by a page that closed
+    if (S.stopped) return;
+    try {
+      const snap = await db.collection(P.cmd).where("status", "==", "running").get();
+      for (const d of snap.docs) {
+        if (S.running.has(d.id)) continue;
+        const ref = db.doc(P.cmd + "/" + d.id);
+        const lease = await ref.acquire({ holder: o.holder, ttlMs: 1000 }).catch(() => ({ acquired: false }));
+        if (!lease.acquired) continue;                         // somebody is still working on it
+        const has = await db.doc(P.res + "/" + d.id).get();
+        if (!has.exists) await db.doc(P.res + "/" + d.id).set({ status: "interrupted", error: "The page was closed or reloaded while this command was running. It was not retried because it may have partly run.", results: [], t: o.now(), holder: o.holder });
+        await ref.update({ status: "interrupted" });
+        o.onLog(d.id + " marked interrupted");
+      }
+    } catch (e) { o.onLog("recover failed: " + msg(e)); }
+  }
+  async function start() {
+    try { await db.doc(P.hello).set({ openedAt: o.now(), holder: o.holder, version: BRIDGE_VERSION, visibility: visState() }); }
+    catch (e) { o.onState("off", "cannot write to your private channel (" + msg(e) + "). You may have view-only access."); return false; }
+    o.onState("on", "waiting for commands");
+    S.unsub = db.collection(P.cmd).where("status", "==", "pending").onSnapshot(
+      (snap) => snap.docChanges().filter((c) => c.type === "added").forEach((c) => enqueue(c.doc)),
+      (err) => o.onState("error", "subscription ended: " + msg(err)));
+    recover(); setTimeout(recover, L.leaseMs + 2000);
+    return true;
+  }
+  function pause(b) { S.paused = !!b; o.onState(S.paused ? "paused" : "on", S.paused ? "commands wait until you resume" : "waiting for commands"); }
+  function stop() { S.stopped = true; if (S.unsub) { try { S.unsub(); } catch (_) {} } }
+
+  return { start, stop, pause, validate, runStep: (s) => runStep(s, { cmdId: "manual", n: 1 }), paths: P, readLock, lockInfo: async () => lockInfo(await readLock()), holder: o.holder, version: BRIDGE_VERSION, limits: L };
+}
+
+/* Optional helper: turn the page (or one element) into a small JPEG data URL with html2canvas. */
+function makeHtml2canvasSnapshot(defaultTarget, o2) {
+  const cfg = Object.assign({ maxWidth: 900, maxChars: 180000 }, o2);
+  return async function (target) {
+    if (typeof html2canvas !== "function") return null;
+    let c = await html2canvas(target || defaultTarget || document.body, { backgroundColor: getComputedStyle(document.body).backgroundColor, scale: 1, logging: false });
+    if (c.width > cfg.maxWidth) {
+      const out = document.createElement("canvas"); out.width = cfg.maxWidth; out.height = Math.round(c.height * cfg.maxWidth / c.width);
+      out.getContext("2d").drawImage(c, 0, 0, out.width, out.height); c = out;
+    }
+    for (const q of [0.75, 0.55, 0.4, 0.3]) { const u = c.toDataURL("image/jpeg", q); if (u.length < cfg.maxChars) return u; }
+    return null;
+  };
+}
+/* ===================== END REMOTE CONTROL BRIDGE ===================== */
+
+
+/* ===================== REMOTE CONTROL WIRING (keep) =====================
+   Connects the bridge to this page and to the #rc panel.
+   Needs, loaded before it: the bridge (createBridge, makeHtml2canvasSnapshot), the #rc panel markup,
+   and optionally window.REMOTE_ACTIONS (named actions Claude can call) and the html2canvas script.
+   Optional settings, set BEFORE this script runs:
+     window.RC_OPTIONS = { root: someElement, collapsed: true, limits: { maxSteps: 20 } }                                  */
+const RC = { bridge: null, paused: false, lines: [], lock: null };
+const rcEl = (id) => document.getElementById(id);
+const rcEsc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function rcState(s, detail) { const el = rcEl("rc-state"); el.dataset.s = s; el.textContent = s; rcEl("rc").dataset.s = s; rcEl("rc-detail").textContent = detail || ""; }
+function rcKind(t) { return /error|invalid|failed|interrupted|could not/i.test(t) ? "bad" : /busy|took the app|expired/i.test(t) ? "warn" : /released|done/i.test(t) ? "ok" : /started/i.test(t) ? "run" : "info"; }
+function rcLog(line) {                       // newest first, the list scrolls inside its own box
+  RC.lines.unshift({ t: new Date().toLocaleTimeString(), text: line, k: rcKind(line) });
+  RC.lines.length = Math.min(RC.lines.length, 60);
+  rcEl("rc-log").innerHTML = RC.lines.map((l) => '<li data-k="' + l.k + '"><time>' + rcEsc(l.t) + "</time><span>" + rcEsc(l.text) + "</span></li>").join("");
+}
+if ((window.RC_OPTIONS || {}).collapsed) { rcEl("rc").dataset.collapsed = "true"; rcEl("rc-toggle").setAttribute("aria-expanded", "false"); }
+rcEl("rc-toggle").addEventListener("click", () => { const c = rcEl("rc").dataset.collapsed !== "true"; rcEl("rc").dataset.collapsed = String(c); rcEl("rc-toggle").setAttribute("aria-expanded", String(!c)); });
+function rcLock(l) { RC.lock = l; rcShowLock(); }
+function rcShowLock() {
+  const el = rcEl("rc-lock"), l = RC.lock, now = Date.now();
+  const mini = rcEl("rc-mini");
+  if (!l || !(Number(l.expiresAt) > now)) { el.dataset.s = "free"; el.textContent = "free"; if (mini) mini.textContent = "free"; return; }
+  el.dataset.s = l.state === "running" ? "busy" : "held";
+  el.textContent = (l.state === "running" ? "busy: " : "held by ") + l.agent + (l.state === "running" ? "" : " (idle " + Math.round((now - l.lastActive) / 1000) + "s, frees in " + Math.round((l.expiresAt - now) / 1000) + "s)");
+  if (mini) mini.textContent = l.state === "running" ? l.agent + " · working" : l.agent + " · idle " + Math.round((now - l.lastActive) / 1000) + "s";
+}
+setInterval(rcShowLock, 1000);
+rcEl("rc-pause").addEventListener("change", (e) => { RC.paused = e.target.checked; if (RC.bridge) RC.bridge.pause(RC.paused); else rcState(RC.paused ? "paused" : "off"); });
+
+(async () => {
+  let db = null, user = null;
+  try { db = await window.claude.use("db"); user = await window.claude.use("user"); } catch (_) {}
+  if (!db || !user) { rcState("off", "the db or user capability is not available in this view"); return; }
+  let uid = null;
+  try { uid = await user.id(); } catch (_) {}
+  if (!uid) { rcState("off", "no user id, so there is no private channel"); return; }
+  const opts = window.RC_OPTIONS || {};   // limits: { requireAgent: false } lets commands run without an agent name
+  RC.bridge = createBridge({
+    db, base: "data/users/" + uid + "/rc", root: opts.root || document, limits: Object.assign({ requireAgent: true }, opts.limits),
+    actions: window.REMOTE_ACTIONS || {}, snapshot: makeHtml2canvasSnapshot(document.body),
+    onState: rcState, onLog: rcLog, onLock: rcLock,
+  });
+  if (RC.paused) RC.bridge.pause(true);
+  await RC.bridge.start();
+})();
+/* ===================== END REMOTE CONTROL WIRING ===================== */
+
+</script>
+</body>
+</html>

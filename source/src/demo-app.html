@@ -1,0 +1,19 @@
+<h2 class="demo-title">Task list</h2>
+<div id="form">
+  <div class="field"><label for="item">Task</label><input id="item" type="text" placeholder="What needs doing?"></div>
+  <div class="field"><label for="note">Note</label><textarea id="note" rows="2" placeholder="Optional details"></textarea></div>
+  <div class="row">
+    <label for="category">Category</label>
+    <select id="category"><option>Home</option><option>Work</option><option>Errands</option></select>
+    <label class="chk"><input id="urgent" type="checkbox"> Urgent</label>
+    <button id="add" type="button">Add task</button>
+  </div>
+</div>
+<ul id="list"></ul>
+<div class="row">
+  <button id="sync" type="button">Sync</button><span id="syncing" hidden>Syncing...</span><span id="synced" hidden>Synced ✓</span>
+  <button id="clear" type="button" disabled>Clear all</button>
+  <button id="toggle" type="button">Details</button>
+</div>
+<div id="details" hidden>Tasks are kept in memory only. Reload the page and they are gone.</div>
+<p id="count" class="muted">0 tasks</p>

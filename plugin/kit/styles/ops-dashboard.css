@@ -1,0 +1,33 @@
+/* structure every style keeps: the body collapses, the log scrolls inside its own box, the header mirror of the agent line is hidden unless a style shows it */
+#rc * { box-sizing: border-box; }
+#rc[data-collapsed="true"] .rc-body { display: none; }
+#rc .rc-mini { display: none; }
+#rc .rc-log { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+#rc .rc-log:empty::before { content: "No activity yet"; display: block; padding: 8px 10px; opacity: .55; }
+#rc .rc-detail:empty { display: none; }
+/* ops-dashboard: a monitoring panel: title bar, big coloured state, level column in the log, orange accent. Inspired by Grafana. Brings its own colours. */
+#rc { margin-top: 28px; background: #181b1f; color: #ccccdc; border: 1px solid rgba(204,204,220,.13); border-radius: 2px; font: 13px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#rc .rc-head { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 14px; padding: 0 6px 0 12px; height: 38px; background: #181b1f; border-bottom: 1px solid rgba(204,204,220,.13); }
+#rc .rc-head h2 { margin: 0; font-size: 14px; font-weight: 500; color: #ccccdc; }
+#rc .rc-dot { display: none; }
+#rc .rc-pill { font: 600 12px/1 "Roboto Mono", ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: .08em; color: #f2495c; padding-left: 14px; position: relative; }
+#rc .rc-pill::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 8px; margin-top: -4px; background: #f2495c; border-radius: 1px; }
+#rc .rc-pill[data-s="on"] { color: #73bf69; } #rc .rc-pill[data-s="on"]::before { background: #73bf69; }
+#rc .rc-pill[data-s="running"], #rc .rc-pill[data-s="paused"] { color: #ff9830; } #rc .rc-pill[data-s="running"]::before, #rc .rc-pill[data-s="paused"]::before { background: #ff9830; }
+#rc .rc-toggle { border: 0; background: transparent; color: #9fa7b3; width: 28px; height: 28px; cursor: pointer; border-radius: 2px; font-size: 11px; }
+#rc .rc-toggle:hover { background: rgba(204,204,220,.08); color: #fff; } #rc[data-collapsed="true"] .rc-toggle { transform: rotate(-90deg); } #rc[data-collapsed="true"] .rc-head { border-bottom: 0; }
+#rc .rc-body { padding: 12px; }
+#rc .rc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: rgba(204,204,220,.13); border: 1px solid rgba(204,204,220,.13); }
+#rc .rc-grid > div { background: #111217; padding: 8px 12px; } #rc .rc-grid .rc-k { padding-bottom: 0; } #rc .rc-grid .rc-k + div { padding-top: 0; }
+#rc .rc-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; grid-auto-flow: column; }
+#rc .rc-k { font-size: 11px; color: #8e8e9d; text-transform: uppercase; letter-spacing: .06em; }
+#rc #rc-lock { font: 600 13px/1.4 "Roboto Mono", ui-monospace, Menlo, Consolas, monospace; color: #73bf69; } #rc #rc-lock[data-s="busy"], #rc #rc-lock[data-s="held"] { color: #ff9830; }
+#rc .rc-pause { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; } #rc .rc-pause input { accent-color: #ff9830; }
+#rc .rc-detail { margin-top: 8px; color: #8e8e9d; font-size: 12px; }
+#rc .rc-log { margin-top: 10px; max-height: 164px; background: #111217; border: 1px solid rgba(204,204,220,.13); font: 12px/1.5 "Roboto Mono", ui-monospace, Menlo, Consolas, monospace; }
+#rc .rc-log li { display: grid; grid-template-columns: 78px 44px 1fr; gap: 10px; padding: 3px 10px; border-bottom: 1px solid rgba(204,204,220,.06); }
+#rc .rc-log li::before { content: "INFO"; grid-column: 2; grid-row: 1; font-size: 10px; font-weight: 700; letter-spacing: .06em; color: #6e9fff; padding-top: 1px; }
+#rc .rc-log li[data-k="ok"]::before { content: "OK"; color: #73bf69; } #rc .rc-log li[data-k="run"]::before { content: "RUN"; color: #ff9830; } #rc .rc-log li[data-k="warn"]::before { content: "WARN"; color: #fade2a; } #rc .rc-log li[data-k="bad"]::before { content: "ERR"; color: #f2495c; }
+#rc .rc-log time { grid-column: 1; grid-row: 1; color: #6e6e80; } #rc .rc-log span { grid-column: 3; grid-row: 1; }
+#rc .rc-note { margin-top: 10px; color: #6e6e80; font-size: 11.5px; }
+#rc .rc-sub { margin-top: 10px; font-size: 11px; color: #8e8e9d; text-transform: uppercase; letter-spacing: .06em; }

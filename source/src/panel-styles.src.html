@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel Style Gallery</title>
+<style>
+  :root { --bg:#f5f6f8; --panel:#fff; --fg:#1b2230; --muted:#5d6679; --line:#d7dce5; --accent:#1f5fbf; --accent-fg:#fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#12151c; --panel:#1b2029; --fg:#e6e9f0; --muted:#9aa3b5; --line:#323a48; --accent:#7aa8ff; --accent-fg:#0b1220; } }
+  :root[data-theme="dark"] { --bg:#12151c; --panel:#1b2029; --fg:#e6e9f0; --muted:#9aa3b5; --line:#323a48; --accent:#7aa8ff; --accent-fg:#0b1220; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 8px; } .lead { color: var(--muted); max-width: 62ch; margin: 0 0 20px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  button { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button[aria-pressed="true"] { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; }
+  @media (max-width: 500px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .card h2 { margin: 0; font-size: 18px; } .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .tag { font-size: 11px; font-weight: 650; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 8px; vertical-align: middle; }
+  iframe { width: 100%; height: 460px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .how { margin-top: 28px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+  .how code, .how pre { font: 13px ui-monospace, Consolas, monospace; background: var(--bg); border-radius: 6px; padding: 1px 6px; } .how pre { padding: 12px; overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Panel style gallery</h1>
+  <p class="lead">Six looks for the remote-control panel. Each preview is live: it plays a made-up session (a command running, a second agent being turned away, a pause, a release, an error) so you can see every state. Pick one, copy its CSS, and replace the contents of <code>rc-panel.css</code>. The markup and the wiring do not change.</p>
+  <div class="bar" role="group" aria-label="Preview page background">
+    <span style="align-self:center;color:var(--muted);font-size:14px">Preview on a</span>
+    <button type="button" id="bg-light" aria-pressed="true">light page</button>
+    <button type="button" id="bg-dark" aria-pressed="false">dark page</button>
+    <button type="button" id="replay">Replay</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <section class="how">
+    <h2 style="margin-top:0;font-size:18px">Use one</h2>
+    <ol>
+      <li>Press <b>Copy CSS</b> on the style you like.</li>
+      <li>Single-file app: replace the <code>#rc</code> rules in your <code>&lt;style&gt;</code> block. Multi-file app: replace the contents of <code>rc/rc-panel.css</code>.</li>
+      <li>Done. The files are also in <code>kit/styles/</code>.</li>
+    </ol>
+    <p style="color:var(--muted);font-size:14px">Make your own: keep the markup, keep the few lines at the bottom of each file under "structure every style keeps" (collapse and scrolling log), and change colours, spacing and fonts. The <code>data-s</code> attributes on <code>#rc</code>, <code>#rc-state</code>, <code>#rc-lock</code> and the log lines' <code>data-k</code> are your hooks.</p>
+  </section>
+</main>
+<script>
+const STYLES = /*__STYLES_JSON__*/{};
+const PANEL = /*__PANEL_JSON__*/"";
+const INFO = {
+  hairline:        ["Hairline", "light or dark", "Black on white, one-pixel rules, monospace labels. Follows your page's own colour tokens, so it fits light and dark apps. The default. Inspired by the Vercel Geist look."],
+  enterprise:      ["Enterprise", "light", "Light grey, square corners, tag-style status and a data-table log with a blue top rule. Inspired by IBM Carbon."],
+  "quiet-dark":    ["Quiet dark", "dark", "Near black with faint borders and small calm type. Colour appears only in the status dot. Inspired by Linear."],
+  "ops-dashboard": ["Ops dashboard", "dark", "A monitoring panel: title bar, big coloured readouts and a level column in the log. Inspired by Grafana."],
+  "control-room":  ["Control room", "light", "A plant-floor HMI look: flat grey, an annunciator tile for the state, an alarm-list log with priority bars. Colour only means something is happening."],
+  minimal:         ["Minimal", "light or dark", "One quiet line: a dot, the state, and who holds the app. Click the arrow for the rest. Follows your colour tokens."]
+};
+let pageDark = false;
+const SIM = "(" + function () {
+  const $ = (id) => document.getElementById(id), rc = $("rc");
+  if (document.documentElement.dataset.start === "collapsed") { rc.dataset.collapsed = "true"; }
+  const kind = (t) => /error|invalid|failed|interrupted/i.test(t) ? "bad" : /busy|took/i.test(t) ? "warn" : /released|done/i.test(t) ? "ok" : /started/i.test(t) ? "run" : "info";
+  const lines = [];
+  const log = (t) => { lines.unshift({ t: new Date().toLocaleTimeString(), text: t, k: kind(t) }); $("rc-log").innerHTML = lines.slice(0, 60).map((l) => '<li data-k="' + l.k + '"><time>' + l.t + "</time><span>" + l.text + "</span></li>").join(""); };
+  const state = (s, d) => { rc.dataset.s = s; const e = $("rc-state"); e.dataset.s = s; e.textContent = s; $("rc-detail").textContent = d || ""; };
+  const lock = (k, t, m) => { const e = $("rc-lock"); e.dataset.s = k; e.textContent = t; $("rc-mini").textContent = m || t; };
+  $("rc-toggle").addEventListener("click", () => { const c = rc.dataset.collapsed !== "true"; rc.dataset.collapsed = String(c); });
+  $("rc-pause").addEventListener("change", (e) => state(e.target.checked ? "paused" : "on", e.target.checked ? "commands wait until you resume" : "waiting for commands"));
+  const script = [
+    [300, () => { state("on", "waiting for commands"); lock("free", "free"); log("page opened, bridge 2.1"); }],
+    [1400, () => { lock("busy", "busy: Sales report helper", "Sales report helper · working"); state("running", "hc-001"); log("Sales report helper · a1b2c3d4  hc-001 started (5 steps)"); }],
+    [2600, () => log("hc-002: Chart helper was told the app is busy (Sales report helper)")],
+    [3800, () => { lock("held", "held by Sales report helper (idle 2s, frees in 118s)", "Sales report helper · idle 2s"); state("on", "waiting for commands"); log("Sales report helper · a1b2c3d4  hc-001 done"); }],
+    [5200, () => { lock("free", "free"); log("Sales report helper released the app"); }],
+    [6200, () => { lock("busy", "busy: Chart helper", "Chart helper · working"); state("running", "hc-003"); log("Chart helper · 9f8e7d6c  hc-003 started (4 steps)"); }],
+    [7400, () => { lock("held", "held by Chart helper (idle 1s, frees in 119s)", "Chart helper · idle 1s"); state("error", "subscription ended: network"); log("rescan failed: network"); }],
+    [8400, () => { state("on", "waiting for commands"); log("hc-003 error: Step 3 (click): Element is disabled"); }],
+    [9300, () => { for (let i = 1; i <= 8; i++) log("Chart helper · 9f8e7d6c  hc-00" + (3 + i) + " done"); }],
+  ];
+  script.forEach(([ms, fn]) => setTimeout(fn, ms));
+}.toString() + ")();";
+function doc(name, dark) {
+  const bg = dark ? "#12151c" : "#f5f6f8", fg = dark ? "#e6e9f0" : "#1b2230";
+  const tokens = dark ? "--panel:#1b2029;--fg:#e6e9f0;--muted:#9aa3b5;--line:#323a48;--ok:#5fd39a;--warn:#f0b35a;--err:#ff7b86;" : "--panel:#fff;--fg:#1b2230;--muted:#5d6679;--line:#d7dce5;--ok:#1d6036;--warn:#9a5b00;--err:#8a1c1c;";
+  return "<!doctype html><html data-start='" + (name === "minimal" ? "collapsed" : "") + "'><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><style>:root{" + tokens + "}html{height:100%}body{margin:0;padding:14px;min-height:100%;background:" + bg + ";color:" + fg + ";font:14px system-ui,sans-serif}</style><style>" + STYLES[name] + "</style><body><p style='margin:0 0 6px;opacity:.7'>Your app is here.</p>" + PANEL + "<script>" + SIM.replace(/<\/script/gi, "<\\/script") + "<\/script>";
+}
+const frames = {};
+function render() {
+  Object.keys(INFO).filter((n) => STYLES[n]).forEach((name) => { frames[name].srcdoc = doc(name, pageDark); });
+}
+const copy = async (text, btn) => { try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; } catch (_) { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); btn.textContent = "Copied"; } catch (e) { btn.textContent = "Select and copy manually"; } t.remove(); } setTimeout(() => (btn.textContent = "Copy CSS"), 1500); };
+const download = (name, text) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/css" })); a.download = name + ".css"; document.body.appendChild(a); a.click(); a.remove(); };
+Object.keys(INFO).filter((n) => STYLES[n]).forEach((name) => {
+  const [title, mode, desc] = INFO[name] || [name, "", ""];
+  const card = document.createElement("div"); card.className = "card";
+  card.innerHTML = "<h2>" + title + '<span class="tag">best on ' + mode + " page</span></h2><p>" + desc + "</p>";
+  const f = document.createElement("iframe"); f.title = title + " preview"; frames[name] = f; card.appendChild(f);
+  const row = document.createElement("div"); row.className = "row";
+  const c = document.createElement("button"); c.className = "primary"; c.textContent = "Copy CSS"; c.onclick = () => copy(STYLES[name], c);
+  const d = document.createElement("button"); d.textContent = "Download " + name + ".css"; d.onclick = () => download(name, STYLES[name]);
+  row.append(c, d); card.appendChild(row); document.getElementById("grid").appendChild(card);
+});
+const setBg = (dark) => { pageDark = dark; document.getElementById("bg-light").setAttribute("aria-pressed", String(!dark)); document.getElementById("bg-dark").setAttribute("aria-pressed", String(dark)); render(); };
+document.getElementById("bg-light").onclick = () => setBg(false);
+document.getElementById("bg-dark").onclick = () => setBg(true);
+document.getElementById("replay").onclick = render;
+render();
+</script>
+</body>
+</html>

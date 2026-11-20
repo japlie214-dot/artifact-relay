@@ -1,0 +1,15 @@
+{
+  "mcp": {
+    "servers": [
+      { "server": "SNOWFLAKE SQL EXECUTE", "tools": ["sql_exec_tool"] }
+    ]
+  },
+  "db": {
+    "rules": [
+      { "path": "",                  "read": "view", "write": "admin" },
+      { "path": "data/users/{self}", "write": "interact" }
+    ]
+  },
+  "user": {},
+  "downloads": true
+}

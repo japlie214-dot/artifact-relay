@@ -1,0 +1,26 @@
+/* structure every style keeps: the body collapses, the log scrolls inside its own box, the header mirror of the agent line is hidden unless a style shows it */
+#rc * { box-sizing: border-box; }
+#rc[data-collapsed="true"] .rc-body { display: none; }
+#rc .rc-mini { display: none; }
+#rc .rc-log { list-style: none; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; }
+#rc .rc-log:empty::before { content: "No activity yet"; display: block; padding: 8px 10px; opacity: .55; }
+#rc .rc-detail:empty { display: none; }
+/* minimal: one quiet line. A dot, the state, and who holds the app. Click the arrow for the pause switch and the activity list. Follows your page's colour tokens (--fg --muted --line --ok --warn --err). */
+#rc { --k-fg: var(--fg, #171717); --k-mu: var(--muted, #737373); --k-ln: var(--line, #e5e5e5); --k-ok: var(--ok, #0a7d3e); --k-wr: var(--warn, #a35200); --k-er: var(--err, #c4182d);
+  margin-top: 32px; padding-top: 10px; border-top: 1px solid var(--k-ln); color: var(--k-mu); font: 12px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#rc .rc-head { display: grid; grid-template-columns: 8px auto auto 1fr auto; align-items: center; gap: 8px; }
+#rc .rc-head h2 { margin: 0; font-size: 12px; font-weight: 500; color: var(--k-fg); }
+#rc .rc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--k-er); }
+#rc[data-s="on"] .rc-dot { background: var(--k-ok); } #rc[data-s="running"] .rc-dot, #rc[data-s="paused"] .rc-dot { background: var(--k-wr); }
+#rc .rc-pill { font-size: 12px; color: var(--k-mu); } #rc .rc-pill::before { content: "\00b7  "; }
+#rc .rc-mini { display: block; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#rc .rc-toggle { border: 0; background: transparent; color: var(--k-mu); width: 20px; height: 20px; cursor: pointer; font-size: 10px; padding: 0; }
+#rc[data-collapsed="true"] .rc-toggle { transform: rotate(-90deg); }
+#rc .rc-body { padding: 10px 0 0 16px; }
+#rc .rc-grid { display: block; } #rc .rc-grid > :nth-child(-n+2) { display: none; } #rc .rc-grid .rc-k { display: none; }
+#rc .rc-pause { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+#rc .rc-detail { margin-top: 6px; }
+#rc .rc-log { margin-top: 8px; max-height: 120px; font: 11px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+#rc .rc-log li { display: grid; grid-template-columns: 76px 1fr; gap: 8px; } #rc .rc-log time { opacity: .65; } #rc .rc-log li[data-k="bad"] span { color: var(--k-er); } #rc .rc-log li[data-k="warn"] span { color: var(--k-wr); }
+#rc .rc-note { display: none; }
+#rc .rc-sub { margin-top: 8px; font-size: 11px; opacity: .7; }
