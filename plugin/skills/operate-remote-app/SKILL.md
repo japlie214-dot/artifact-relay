@@ -7,6 +7,8 @@ description: Operate a published Claude app (artifact) that has the remote-contr
 
 The app keeps a private command channel in its database. You write a command document, the open page runs it, and you read the answer. You need the app's artifact URL and the `ArtifactData` tool (load it with ToolSearch `select:ArtifactData` if it is deferred).
 
+> This skill is for published artifacts (`ArtifactData`). If the app is an MCP App widget and you have `relay_send` / `relay_result` tools, use the `relay-mcp-app` skill instead; the steps are the same.
+
 ## The loop
 
 1. **Look first.** Write a command with only `{"action":"ping"}`. It never takes the app. Read `results[0].lock`: if another session holds the app, wait and try again. Do not use `takeover` unless the person says so.

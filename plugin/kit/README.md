@@ -17,6 +17,7 @@ Everything you need to let Claude operate, read and screenshot a Claude app. Thr
 | `publish/capabilities.with-connector.json` | The same plus a connector (Snowflake shown). |
 | `prompts.md` | Copy-paste sentences to say to Claude. |
 | `CHECKLIST.md` | Before you publish, before you rely on it, before you share it. |
+| `mcp-app/` | The same remote control for MCP App widgets: server tools, widget shim, assembler and a starter app. |
 
 ## Way A: start from `starter.html` (fastest)
 
@@ -41,6 +42,10 @@ Everything you need to let Claude operate, read and screenshot a Claude app. Thr
 5. Paste `rc/rc-wiring.js` **after** the bridge and your actions.
 6. Wrap your app in an element with `id="app"` and give the controls ids.
 7. Publish with `publish/capabilities.json` (or the `with-connector` version).
+
+## Way D: an MCP App widget
+
+For a widget shown by a local MCP server (Claude Desktop's Code tab, Claude Code) instead of a published artifact. The same bridge runs unchanged; only the database is replaced by a small server-side store. Copy the whole kit, start from `mcp-app/starter/` and read `mcp-app/README.md`. The agent uses the `relay_send` / `relay_result` tools.
 
 ## Conventions the bridge relies on
 

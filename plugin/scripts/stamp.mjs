@@ -25,9 +25,21 @@ if (event === "SessionStart" || event === "UserPromptSubmit") {
   }
   process.exit(0);
 }
-if (event !== "PreToolUse" || !input.tool_name || !/ArtifactData$/.test(input.tool_name)) process.exit(0);
+const isMcpRelay = /^mcp__.+__relay_send$/.test(input.tool_name || "");   // an MCP App server built on the kit (mcp-app/)
+if (event !== "PreToolUse" || !input.tool_name || !(isMcpRelay || /ArtifactData$/.test(input.tool_name))) process.exit(0);
 
 const ti = input.tool_input || {};
+if (isMcpRelay) {                              // relay_send takes the command as its own arguments: stamp them directly
+  if (!Array.isArray(ti.steps) || !input.session_id) process.exit(0);
+  let t = "";
+  try { const f = join(stateDir, "title-" + safe(input.session_id) + ".txt"); if (existsSync(f)) t = readFileSync(f, "utf8").trim(); } catch {}
+  const r = { ...ti, session: String(input.session_id), stampedBy: "rc-plugin/0.2" };
+  if (input.agent_id) r.subagent = { id: String(input.agent_id), type: String(input.agent_type || "") }; else delete r.subagent;
+  if (t) r.sessionTitle = t.slice(0, 80); else delete r.sessionTitle;
+  const o = { hookEventName: "PreToolUse", updatedInput: r, additionalContext: "relay_send stamped with session " + String(input.session_id).slice(0, 8) + (input.agent_id ? " (subagent " + String(input.agent_id).slice(0, 8) + ")" : "") + "." };
+  const d = process.env.RC_STAMP_DECISION; if (d === "allow" || d === "ask") o.permissionDecision = d;
+  out({ hookSpecificOutput: o });
+}
 const wanted = (process.env.RC_STAMP_ARTIFACTS || "").split(",").map((s) => s.trim()).filter(Boolean);
 if (wanted.length && !wanted.some((u) => String(ti.url || "").includes(u))) process.exit(0);
 

@@ -47,3 +47,16 @@ Tick these off in order. Each line exists because skipping it caused a real prob
 
 - [ ] Selectors you or Claude used still exist (send `read`).
 - [ ] You are not republishing while a command is running. A republish reloads open pages.
+
+## MCP App widgets (`mcp-app/`)
+
+- [ ] You copied the whole `kit` folder (the starter imports `../server`, `../widget`, `../../multi-file/rc`), ran `npm install`, `node build-view.mjs` and `npm test`.
+- [ ] `app.html` has `id="app"`, every control has an `id`, and both marker comments (`RELAY_PANEL`, `RELAY_SCRIPTS`) are present.
+- [ ] Widget-only tools use `visibility:["app"]`; the agent-facing open tool uses `visibility:["model"]`.
+- [ ] The widget URI includes a hash of the bundle, and you know a rebuilt widget needs the host restarted.
+- [ ] Only the person edits `claude_desktop_config.json`, with Claude Desktop closed. The entry points at your `server.mjs` with an absolute path.
+- [ ] After the host restarts: open tool shows the widget, the panel says `on`, and `relay_send` with `ping` answers.
+- [ ] `relay_send` before the widget is open is refused with a clear message (try it once).
+- [ ] You drove the real widget with fill, click, wait_for, read and a screenshot through `relay_send`, and the person saw the same state on screen.
+- [ ] A second session gets `busy` while the first holds the app; `release:true` frees it.
+- [ ] You did not edit `bridge.js` or the panel to make it work; only `mcp-app/` files differ from an Artifact app.

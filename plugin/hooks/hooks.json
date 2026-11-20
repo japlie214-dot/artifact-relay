@@ -1,5 +1,5 @@
 {
-  "description": "Stamps remote-control commands with the real session id, and remembers each session's title.",
+  "description": "Stamps remote-control commands (ArtifactData writes and MCP relay_send calls) with the real session id, and remembers each session's title.",
   "hooks": {
     "SessionStart": [
       { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
@@ -8,7 +8,8 @@
       { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
     ],
     "PreToolUse": [
-      { "matcher": "ArtifactData", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
+      { "matcher": "ArtifactData", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] },
+      { "matcher": "mcp__.*__relay_send", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/stamp.mjs\"", "timeout": 5 } ] }
     ]
   }
 }

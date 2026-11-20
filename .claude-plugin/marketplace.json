@@ -5,7 +5,7 @@
     {
       "name": "claude-app-remote-control",
       "source": "./plugin",
-      "description": "Artifact Relay: operate published Claude apps from a Claude session: session identity stamped by a hook, a busy lock, skills for operating and building, and a starter kit."
+      "description": "Artifact Relay: operate Claude apps (published artifacts and MCP App widgets) from a Claude session: session identity stamped by a hook, a busy lock, skills for operating and building, and a starter kit."
     }
   ]
 }

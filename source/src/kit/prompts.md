@@ -86,3 +86,37 @@ wait and try again; do not use takeover unless I say so. When you finish, send y
 ```
 
 To see who holds the app at any time, read the document `data/users/me/rc/meta/lock`. If its `expiresAt` is in the past, the app is free.
+
+## MCP App widgets
+
+For an MCP App built on `mcp-app/` (tools `relay_send` / `relay_result`). Use these instead of the Artifact prompts above.
+
+**First run**
+
+```
+Open the widget with <OPEN TOOL NAME>. Then use relay_send, with "agent" set to your session name:
+1) ping, then tell me the bridge version and who holds the app.
+2) read, then list the controls you found with their selectors.
+3) take a screenshot and describe what you see.
+```
+
+**Do a task**
+
+```
+In the open widget, do this: <WHAT YOU WANT>. Use the widget's controls through relay_send, not the server's own tools
+and not your own arithmetic. Read first to find the controls, then check each step's ok. When you finish, read the page
+again and tell me what the widget shows. Send "release": true on your last call.
+```
+
+**Prove the bridge works on this widget**
+
+```
+Drive the widget through relay_send only: fill a field, click its button, wait_for the result, read it back, take a
+screenshot, then send release. Report each step's result in one line and tell me whether the screenshot matches what I see.
+```
+
+**After I rebuilt the widget**
+
+```
+I restarted <Claude Desktop / Claude Code>. Open the widget again and run ping and read to confirm you see the new version.
+```

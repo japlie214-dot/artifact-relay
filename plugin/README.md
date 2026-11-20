@@ -2,7 +2,7 @@
 
 What it gives a Claude session:
 
-- **Skills**: `operate-remote-app` (how to drive an app that has the remote-control panel) and `build-remote-app` (how to build or publish one, from the files in `kit/`).
+- **Skills**: `operate-remote-app` (drive a published app that has the remote-control panel), `build-remote-app` (build or publish one, from the files in `kit/`) and `relay-mcp-app` (build or operate an MCP App widget with the same bridge, from `kit/mcp-app/`).
 - **A hook** (`scripts/stamp.mjs`) that adds the real session id to every remote-control command, so the app can tell sessions apart without trusting what the model writes.
 - **The kit** (`kit/`: starter app, panel styles, publish settings, prompts, checklist) and **docs** (`docs/`).
 
@@ -20,7 +20,7 @@ Run `/reload-plugins` after changes. For a team, put the folder in a git reposit
 
 ## What the hook does and does not do
 
-- It acts only on `ArtifactData` calls that write to a collection ending in `/rc/cmd` with a `steps` list. Everything else passes through untouched.
+- It acts only on `ArtifactData` calls that write to a collection ending in `/rc/cmd` with a `steps` list, and on MCP `relay_send` calls (tool names `mcp__<server>__relay_send`) that carry `steps`. Everything else passes through untouched.
 - It replaces `session`, `subagent` and `sessionTitle` in the command with values from the harness, so the model cannot forge them while the hook is active.
 - The title is only known to hooks at session start and on prompt submit; the hook remembers it. A session with no title shows its short id.
 - It makes no permission decision by default, so normal prompts apply. Set `RC_STAMP_DECISION=allow` (or `ask`) in your environment to choose otherwise. Set `RC_STAMP_ARTIFACTS=<url>,<url>` to stamp only commands for specific apps.
@@ -29,4 +29,4 @@ Run `/reload-plugins` after changes. For a team, put the folder in a git reposit
 
 ## Check it works
 
-Send any remote-control command, then read the command document back from `data/users/me/rc/cmd/<id>`. It should contain `session`, `stampedBy: "rc-plugin/0.1"` and, inside a subagent, `subagent`. The app's panel then shows the session id next to the activity.
+Send any remote-control command, then read the command document back from `data/users/me/rc/cmd/<id>` (for an MCP widget, the `relay_send` result's step results show who held the app). It should contain `session`, `stampedBy` (`rc-plugin/0.1` for ArtifactData, `rc-plugin/0.2` for `relay_send`) and, inside a subagent, `subagent`. The app's panel then shows the session id next to the activity.

@@ -123,6 +123,8 @@ test('the unchanged kit bridge runs over MCP: ping, named action, screenshot as 
     assert.equal(pinged.results[0].pong, true);
     assert.equal(pinged.results[0].version, '2.2');
     assert.equal(ping.structuredContent.finished, true);
+    // The host may show the agent only structuredContent, so the results must be there too.
+    assert.equal(ping.structuredContent.results[0].pong, true);
 
     // a named action, then a screenshot that arrives as an image the agent can look at
     const second = await ok('relay_send', { steps: [{ action: 'call', name: 'getState' }, { action: 'screenshot' }], agent: 'tester', waitMs: 8000 });

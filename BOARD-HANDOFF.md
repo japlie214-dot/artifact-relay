@@ -111,3 +111,15 @@ Result: no pass. The widget never armed, so no drive or receipt was possible.
 - Server process pid 10064 started 07:49:56, after the last edit (bundle 07:48:37), so it is current. Expected URI `ui://artifact-relay/calculator-d4fa2731`.
 - `relay_open_calculator` returned "Relay Calculator is ready in an MCP Apps host." but `relay-debug.log` shows no `arm` or `poll` line from this session; `relay_inspect_calculator` was refused ("No calculator is listening", log: `inspect refused`).
 - Inference, not verified: the Claude Code tab session that ran the tool does not render MCP Apps widgets, so nothing armed. Retry from a Claude Desktop Chat conversation (new one, so it picks up the new tool list), where the widget can render.
+
+## Update: unchanged kit on MCP (final state)
+
+**Verdict: Artifact Relay is implementable on MCP Apps with the bridge unchanged.** `bridge.js` (v2.2), `rc-wiring.js` and the panel run as-is inside the MCP widget; only the database is replaced (`kit/mcp-app/widget/mcp-db.js` over the `relay_db` app-only tool, in-memory store in `kit/mcp-app/server/`). Agent tools: `relay_send`, `relay_result`.
+
+Live in Claude Desktop (Code tab, after restart): ping/read, fill, select, click, wait_for, text, screenshot (as image), named action `getState`, element screenshot, 7÷0 error path, panel lock, `release:true`; 8×9=72 matched on screen.
+
+Finding: the host shows the agent `structuredContent` and may drop the text block, so `relay_send` returns step results in `structuredContent` (fixed, live-verified).
+
+Packaged: `kit/mcp-app/` (README, server, widget, `starter/` with test), plugin skill `relay-mcp-app`, hook support for `mcp__*__relay_send` (stamp.mjs, `rc-plugin/0.2`), prompts, checklist, pitfalls, plugin 0.2.0. Plugin and marketplace ids unchanged; bridge and the 45 stress tests untouched. The starter was verified from a clean copy of `plugin/kit` (npm install, build, test).
+
+Remaining limits/untested: two widgets at once in a real host, idle expiry, widget restart on change (hosts cache by URI; restart needed), claude.ai chat cannot reach a local server, nothing pushed to GitHub.

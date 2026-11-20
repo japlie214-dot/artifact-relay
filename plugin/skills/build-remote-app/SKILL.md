@@ -5,6 +5,8 @@ description: Build and publish a new Claude app (artifact) that Claude can opera
 
 # Building a remote-controllable Claude app
 
+If the app is an MCP App widget (a local MCP server showing a widget in Claude Desktop or Claude Code) rather than a published artifact, use the `relay-mcp-app` skill and `${CLAUDE_PLUGIN_ROOT}/kit/mcp-app/` instead.
+
 Everything you need is in this plugin's `kit` folder: `${CLAUDE_PLUGIN_ROOT}/kit`. Read `${CLAUDE_PLUGIN_ROOT}/kit/README.md` first, then follow it.
 
 ## Steps

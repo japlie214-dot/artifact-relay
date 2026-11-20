@@ -76,8 +76,14 @@ export function registerRelay(server, {
     }
     const r = res.data;
     const results = Array.isArray(r.results) ? r.results : [];
-    let json = JSON.stringify({ id, status: r.status, error: r.error ?? null, results });
-    if (json.length > 100_000) json = json.slice(0, 100_000) + " …(truncated)";
+    // Hosts show the agent structuredContent when a tool returns it, and may drop the text block: so the results go in both.
+    // Over the limit, step details are dropped (each step keeps ok / error) rather than cutting JSON in half.
+    let shown = results;
+    let json = JSON.stringify({ id, status: r.status, error: r.error ?? null, results: shown });
+    if (json.length > 100_000) {
+      shown = results.map((s) => ({ step: s.step, action: s.action, ok: s.ok, error: s.error, snap: s.snap }));
+      json = JSON.stringify({ id, status: r.status, error: r.error ?? null, results: shown, note: "Step details were dropped because the result was too large. Ask for less, for example read with a selector." });
+    }
     const content = [{ type: "text", text: json }];
     for (const step of results) {
       if (typeof step.snap !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(step.snap)) continue;
@@ -85,7 +91,7 @@ export function registerRelay(server, {
       const m = typeof url === "string" && /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(url);
       if (m) content.push({ type: "image", data: m[1], mimeType: "image/jpeg" });
     }
-    return { content, structuredContent: { id, status: r.status, finished: true, error: r.error ?? null, steps: results.length }, ...(r.status !== "done" && { isError: true }) };
+    return { content, structuredContent: { id, status: r.status, finished: true, error: r.error ?? null, results: shown }, ...(r.status !== "done" && { isError: true }) };
   }
 
   const wait = z.number().int().min(0).max(maxWaitMs).optional();
